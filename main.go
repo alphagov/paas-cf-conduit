@@ -15,14 +15,15 @@ import (
 )
 
 var (
-	Verbose        bool
-	NonInteractive bool
-	ConduitKeepApp bool
-	ConduitAppName string
-	ConduitOrg     string
-	ConduitSpace   string
-	shutdown       chan struct{}
-	fatalshutdown  chan struct{}
+	Verbose          bool
+	NonInteractive   bool
+	ConduitKeepApp   bool
+	ConduitAppName   string
+	ConduitOrg       string
+	ConduitSpace     string
+	ConduitLocalPort int64
+	shutdown         chan struct{}
+	fatalshutdown    chan struct{}
 )
 
 func init() {
@@ -85,6 +86,7 @@ func main() {
 	cmd.PersistentFlags().StringVarP(&ConduitSpace, "space", "s", "", "target space (defaults to currently targeted space)")
 	cmd.PersistentFlags().BoolVarP(&ConduitKeepApp, "keep-app", "", false, "speed up multiple invocations of conduit by not destroying the tunnelling app")
 	cmd.PersistentFlags().StringVarP(&ConduitAppName, "app-name", "", fmt.Sprintf("__conduit_%d__", os.Getpid()), "app name to use for tunnelling app (must not exist)")
+	cmd.PersistentFlags().Int64VarP(&ConduitLocalPort, "local-port", "p", 7080, "start selecting local ports from")
 	cmd.AddCommand(ConnectService)
 	cmd.AddCommand(Uninstall)
 	plugin.Start(&Plugin{cmd})

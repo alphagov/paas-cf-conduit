@@ -17,10 +17,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	LocalPort int64
-)
-
 const tunnelInfo = `
 The following services are ready for you to connect to:
 
@@ -35,10 +31,6 @@ The following services are ready for you to connect to:
 	{{end}}
 {{end}}
 `
-
-func init() {
-	ConnectService.Flags().Int64VarP(&LocalPort, "local-port", "p", 7080, "start selecting local ports from")
-}
 
 func waitForConnection(addr string) chan error {
 	timeout := 3 * time.Second
@@ -183,7 +175,7 @@ var ConnectService = &cobra.Command{
 			},
 		}
 		// for each service instance
-		localPort := LocalPort
+		localPort := ConduitLocalPort
 		for _, name := range serviceInstanceNames {
 			bound := false
 			for serviceInstanceGuid, serviceInstance := range serviceInstances {

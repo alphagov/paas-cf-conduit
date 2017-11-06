@@ -310,8 +310,7 @@ func (c *Client) GetServiceInstances(filters ...string) (map[string]*ServiceInst
 
 func (c *Client) BindService(appGuid string, serviceInstanceGuid string) (*Credentials, error) {
 	res := struct {
-		Metadata Metadata `json:"metadata"`
-		Entity   struct {
+		Entity struct {
 			Credentials Credentials `json:"credentials"`
 		} `json:"entity"`
 	}{}
