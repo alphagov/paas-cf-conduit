@@ -104,7 +104,7 @@ var ConnectService = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// create status writer
-		status := NewStatus(Stderr)
+		status := NewStatus(os.Stderr)
 		defer status.Done()
 		// parse args
 		var serviceInstanceNames []string
@@ -290,7 +290,7 @@ var ConnectService = &cobra.Command{
 			t := template.Must(template.New("tunnelInfo").Parse(tunnelInfo))
 			var out bytes.Buffer
 			t.Execute(&out, appEnv.SystemEnv)
-			fmt.Fprintln(Stderr, out.String())
+			fmt.Fprintln(os.Stderr, out.String())
 		}
 		// execute CMD with enviornment
 		runargChan := make(chan struct{})
@@ -305,9 +305,9 @@ var ConnectService = &cobra.Command{
 			for k, v := range runenv {
 				proc.Env = append(proc.Env, fmt.Sprintf("%s=%s", k, v))
 			}
-			proc.Stdout = Stdout
-			proc.Stdin = Stdin
-			proc.Stderr = Stderr
+			proc.Stdout = os.Stdout
+			proc.Stdin = os.Stdin
+			proc.Stderr = os.Stderr
 			status.Done()
 			debug("running", runargs)
 			if err := proc.Start(); err != nil {
@@ -318,7 +318,7 @@ var ConnectService = &cobra.Command{
 				proc.Wait()
 			}()
 		} else {
-			fmt.Fprintln(Stderr, "\n\nPress Ctrl+C to shutdown.")
+			fmt.Fprintln(os.Stderr, "\n\nPress Ctrl+C to shutdown.")
 		}
 		// wait
 		select {

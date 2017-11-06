@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/briandowns/spinner"
@@ -13,7 +14,7 @@ func NewStatus(w io.Writer) *Status {
 	s := &Status{
 		spin: spinner.New(spinner.CharSets[14], 250*time.Millisecond),
 	}
-	s.spin.Writer = Stderr
+	s.spin.Writer = os.Stderr
 	s.spin.Prefix = ""
 	s.spin.Suffix = ""
 	return s

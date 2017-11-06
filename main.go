@@ -21,9 +21,6 @@ var (
 	ConduitAppName string
 	shutdown       chan struct{}
 	fatalshutdown  chan struct{}
-	Stdin          = os.Stdin
-	Stdout         = os.Stdout
-	Stderr         = os.Stderr
 )
 
 func init() {
@@ -41,13 +38,10 @@ func init() {
 			log.Println("...shutting down")
 		}
 	}()
-	os.Stdin = nil
-	os.Stdout = nil
-	// os.Stderr = nil
 }
 
 func fatal(args ...interface{}) {
-	fmt.Fprintln(Stderr, args...)
+	fmt.Fprintln(os.Stderr, args...)
 	close(fatalshutdown)
 	time.Sleep(10 * time.Second)
 	os.Exit(1)
@@ -55,7 +49,7 @@ func fatal(args ...interface{}) {
 
 func debug(args ...interface{}) {
 	if Verbose {
-		fmt.Fprintln(Stderr, args...)
+		fmt.Fprintln(os.Stderr, args...)
 	}
 }
 
@@ -77,7 +71,7 @@ func retry(fn func() error) error {
 }
 
 func main() {
-	if terminal.IsTerminal(int(Stdout.Fd())) && terminal.IsTerminal(int(Stderr.Fd())) {
+	if terminal.IsTerminal(int(os.Stdout.Fd())) && terminal.IsTerminal(int(os.Stderr.Fd())) {
 		NonInteractive = false
 	} else {
 		NonInteractive = true
