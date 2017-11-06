@@ -9,17 +9,12 @@ import (
 	"code.cloudfoundry.org/cli/plugin"
 )
 
-var (
-	conn plugin.CliConnection
-)
-
 type Plugin struct {
 	cmd *cobra.Command
 }
 
-func (p *Plugin) Run(c plugin.CliConnection, args []string) {
-	conn = c // FIXME: this isn't great, can we pass into p.cmd somehow?
-	// set defaults
+func (p *Plugin) Run(conn plugin.CliConnection, args []string) {
+	// set defaults from plugin info
 	org, err := conn.GetCurrentOrg()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -32,6 +27,26 @@ func (p *Plugin) Run(c plugin.CliConnection, args []string) {
 		os.Exit(1)
 	}
 	p.cmd.PersistentFlags().Lookup("space").Value.Set(space.Name)
+	api, err := conn.ApiEndpoint()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	p.cmd.PersistentFlags().Lookup("endpoint").Value.Set(api)
+	token, err := conn.AccessToken()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	p.cmd.PersistentFlags().Lookup("token").Value.Set(token)
+	insecure, err := conn.IsSSLDisabled()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if insecure {
+		p.cmd.PersistentFlags().Lookup("insecure").Value.Set("true")
+	}
 	// parse
 	p.cmd.SetArgs(args)
 	if err := p.cmd.Execute(); err != nil {

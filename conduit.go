@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -110,7 +109,7 @@ var ConnectService = &cobra.Command{
 		}
 		// create a client
 		status.Text("Connecting client")
-		client, err := NewClient(conn)
+		client, err := NewClient(ApiEndpoint, ApiToken, ApiInsecure)
 		if err != nil {
 			return err
 		}
@@ -133,7 +132,7 @@ var ConnectService = &cobra.Command{
 			return err
 		}
 		defer func() {
-			if !ConduitKeepApp {
+			if ConduitReuse {
 				debug("destroying", ConduitAppName, appGuid)
 				if err := client.DestroyApp(appGuid); err != nil {
 					debug("failed to cleanup", ConduitAppName, "app:", err)
@@ -166,13 +165,7 @@ var ConnectService = &cobra.Command{
 			TunnelAddr:    client.Info.AppSshEndpoint,
 			TunnelHostKey: client.Info.AppSshHostKey,
 			ForwardAddrs:  []ForwardAddrs{},
-			PasswordFunc: func() (string, error) {
-				sshCodeLines, err := conn.CliCommandWithoutTerminalOutput("ssh-code")
-				if err != nil {
-					return "", err
-				}
-				return strings.TrimSpace(strings.Join(sshCodeLines, "")), nil
-			},
+			PasswordFunc:  client.SSHCode,
 		}
 		// for each service instance
 		localPort := ConduitLocalPort

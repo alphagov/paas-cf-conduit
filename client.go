@@ -20,7 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"code.cloudfoundry.org/cli/plugin"
 	"golang.org/x/oauth2"
 )
 
@@ -40,12 +39,13 @@ type page struct {
 }
 
 type Info struct {
-	DopplerEndpoint string `json:"doppler_logging_endpoint"`
-	LoggingEndpoint string `json:"logging_endpoint"`
-	AuthEndpoint    string `json:"authorization_endpoint"`
-	TokenEndpoint   string `json:"token_endpoint"`
-	AppSshEndpoint  string `json:"app_ssh_endpoint"`
-	AppSshHostKey   string `json:"app_ssh_host_key_fingerprint"`
+	DopplerEndpoint   string `json:"doppler_logging_endpoint"`
+	LoggingEndpoint   string `json:"logging_endpoint"`
+	AuthEndpoint      string `json:"authorization_endpoint"`
+	TokenEndpoint     string `json:"token_endpoint"`
+	AppSshEndpoint    string `json:"app_ssh_endpoint"`
+	AppSshHostKey     string `json:"app_ssh_host_key_fingerprint"`
+	AppSshOauthClient string `json:"app_ssh_oauth_client"`
 }
 
 type Env struct {
@@ -92,6 +92,19 @@ type Space struct {
 	UpdatedAt time.Time `json:"updated_at"`
 	CreatedAt time.Time `json:"created_at"`
 	Name      string    `json:"name"`
+}
+
+type ServiceInstance struct {
+	Guid            string    `json:"guid"`
+	UpdatedAt       time.Time `json:"updated_at"`
+	CreatedAt       time.Time `json:"created_at"`
+	Name            string    `json:"name"`
+	Type            string    `json:"type"`
+	ServicePlanGuid string    `json:"service_plan_guid"`
+	SpaceGuid       string    `json:"space_guid"`
+	// Space           *Space            `json:"-"`
+	// Bindings        []*ServiceBinding `json:"-"`
+	// Plan            *ServicePlan      `json:"-"`
 }
 
 func newHttpClient(authEndpoint string, tokenEndpoint string, token string, insecure bool) (*http.Client, error) {
@@ -145,19 +158,7 @@ func getInfo(api string, insecure bool) (*Info, error) {
 	return &info, err
 }
 
-func NewClient(conn plugin.CliConnection) (*Client, error) {
-	api, err := conn.ApiEndpoint()
-	if err != nil {
-		return nil, err
-	}
-	token, err := conn.AccessToken()
-	if err != nil {
-		return nil, err
-	}
-	insecure, err := conn.IsSSLDisabled()
-	if err != nil {
-		return nil, err
-	}
+func NewClient(api string, token string, insecure bool) (*Client, error) {
 	info, err := getInfo(api, insecure)
 	if err != nil {
 		return nil, err
@@ -167,31 +168,22 @@ func NewClient(conn plugin.CliConnection) (*Client, error) {
 		return nil, err
 	}
 	c := &Client{
-		HttpClient:  httpClient,
-		ApiEndpoint: api,
-		Info:        info,
+		HttpClient:         httpClient,
+		ApiEndpoint:        api,
+		InsecureSkipVerify: insecure,
+		Info:               info,
+		Token:              token,
 	}
 	return c, nil
 }
 
-type ServiceInstance struct {
-	Guid            string    `json:"guid"`
-	UpdatedAt       time.Time `json:"updated_at"`
-	CreatedAt       time.Time `json:"created_at"`
-	Name            string    `json:"name"`
-	Type            string    `json:"type"`
-	ServicePlanGuid string    `json:"service_plan_guid"`
-	SpaceGuid       string    `json:"space_guid"`
-	// Space           *Space            `json:"-"`
-	// Bindings        []*ServiceBinding `json:"-"`
-	// Plan            *ServicePlan      `json:"-"`
-}
-
 type Client struct {
-	Verbose     bool
-	HttpClient  *http.Client
-	ApiEndpoint string
-	Info        *Info
+	Verbose            bool
+	HttpClient         *http.Client
+	ApiEndpoint        string
+	InsecureSkipVerify bool
+	Token              string
+	Info               *Info
 }
 
 func (c *Client) GetAppEnv(appGuid string) (*Env, error) {
@@ -357,7 +349,7 @@ func (c *Client) UploadAppBits(appGuid string, bits io.Reader) error {
 	if err != nil {
 		return err
 	}
-	err = writer.WriteField("async", "false")
+	err = writer.WriteField("async", "true")
 	if err != nil {
 		return err
 	}
@@ -639,4 +631,62 @@ func set(path string, n int, limit int) string {
 	}
 	page.RawQuery = q.Encode()
 	return page.String()
+}
+
+func (c *Client) SSHCode() (string, error) {
+	errPreventRedirect := errors.New("prevent-redirect")
+	httpClient := &http.Client{
+		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+			return errPreventRedirect
+		},
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: c.InsecureSkipVerify,
+			},
+			Proxy:               http.ProxyFromEnvironment,
+			TLSHandshakeTimeout: 10 * time.Second,
+		},
+	}
+
+	authorizeURL, err := url.Parse(c.Info.TokenEndpoint)
+	if err != nil {
+		return "", err
+	}
+
+	values := url.Values{}
+	values.Set("response_type", "code")
+	values.Set("grant_type", "authorization_code")
+	values.Set("client_id", c.Info.AppSshOauthClient)
+
+	authorizeURL.Path = "/oauth/authorize"
+	authorizeURL.RawQuery = values.Encode()
+
+	authorizeReq, err := http.NewRequest("GET", authorizeURL.String(), nil)
+	if err != nil {
+		return "", err
+	}
+
+	authorizeReq.Header.Add("authorization", c.Token)
+
+	resp, err := httpClient.Do(authorizeReq)
+	if err == nil {
+		return "", errors.New("Authorization server did not redirect with one time code")
+	}
+	if netErr, ok := err.(*url.Error); !ok || netErr.Err != errPreventRedirect {
+		return "", fmt.Errorf("Error requesting one time code from server: %v", err)
+	}
+
+	loc, err := resp.Location()
+	if err != nil {
+		return "", fmt.Errorf("Error getting the redirected location: %v", err)
+	}
+
+	codes := loc.Query()["code"]
+	if len(codes) != 1 {
+		return "", fmt.Errorf("Unable to acquire one time code from authorization response")
+	}
+
+	return codes[0], nil
 }

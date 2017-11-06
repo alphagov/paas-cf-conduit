@@ -26,7 +26,25 @@ type Tunnel struct {
 	shutdownChan  chan struct{}
 	shutdownErr   error
 	listeners     []net.Listener
+	passwords     chan string
 	sync.Mutex
+}
+
+func (t *Tunnel) passwordPipe() {
+	if t.passwords != nil {
+		return
+	}
+	t.passwords = make(chan string, 3)
+	go func() {
+		for {
+			pass, err := t.PasswordFunc()
+			if err != nil {
+				fatal(err)
+				return
+			}
+			t.passwords <- pass
+		}
+	}()
 }
 
 func (t *Tunnel) Start() error {
@@ -35,6 +53,7 @@ func (t *Tunnel) Start() error {
 	if t.shutdownChan != nil {
 		return fmt.Errorf("already started")
 	}
+	t.passwordPipe()
 	for _, fwd := range t.ForwardAddrs {
 		listener, err := t.forward(fwd)
 		if err != nil {
@@ -65,10 +84,7 @@ func (t *Tunnel) forward(fwd ForwardAddrs) (net.Listener, error) {
 			// flakey connections that timeout. Once the connection is established
 			// TCP takes care of keeping it working.
 			err = retry(func() error {
-				password, err := t.PasswordFunc()
-				if err != nil {
-					fatal(err)
-				}
+				password := <-t.passwords
 				cfg := &ssh.ClientConfig{
 					User: "cf:" + t.AppGuid + "/0",
 					Auth: []ssh.AuthMethod{ssh.Password(password)},
