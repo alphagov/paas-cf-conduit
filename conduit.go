@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -25,23 +26,21 @@ The following services are ready for you to connect to:
 
 {{range $serviceName, $services := .VcapServices}}
 	{{range $serviceIndex, $service := $services}}
-		service: {{$service.name}} ({{$serviceName}})
-		host: {{$service.credentials.host}}
-		port: {{$service.credentials.port}}
-		username: {{$service.credentials.username}}
-		password: {{$service.credentials.password}}
-		db: {{$service.credentials.name}}
+		service: {{$service.Name}} ({{$serviceName}})
+		host: {{$service.Credentials.Host}}
+		port: {{$service.Credentials.Port}}
+		username: {{$service.Credentials.Username}}
+		password: {{$service.Credentials.Password}}
+		db: {{$service.Credentials.Name}}
 	{{end}}
 {{end}}
-
-Press Ctrl+C to shutdown.
 `
 
 func init() {
 	ConnectService.Flags().Int64VarP(&LocalPort, "local-port", "p", 7080, "start selecting local ports from")
 }
 
-func waitForConnection(port int64) chan error {
+func waitForConnection(addr string) chan error {
 	timeout := 3 * time.Second
 	connection := make(chan error)
 	go func() {
@@ -54,12 +53,13 @@ func waitForConnection(port int64) chan error {
 				time.Sleep(1 * time.Second)
 			}
 			tries++
-			conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), timeout)
+			debug("waiting for", addr, "attempt", tries)
+			conn, err := net.DialTimeout("tcp", addr, timeout)
 			if err != nil {
 				if tries < 15 {
 					continue
 				}
-				connection <- fmt.Errorf("timeout waiting for tunnel to start: %s", err)
+				connection <- fmt.Errorf("connection fail after %d attempts: %s", tries, err)
 				break
 			}
 			defer conn.Close()
@@ -103,11 +103,10 @@ var ConnectService = &cobra.Command{
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		lg := func(args ...interface{}) {
-			if Verbose {
-				fmt.Fprintln(Stderr, args...)
-			}
-		}
+		// create status writer
+		status := NewStatus(Stderr)
+		defer status.Done()
+		// parse args
 		var serviceInstanceNames []string
 		var runargs []string
 		if cmd.ArgsLenAtDash() > -1 {
@@ -117,180 +116,185 @@ var ConnectService = &cobra.Command{
 			serviceInstanceNames = args
 			runargs = []string{}
 		}
-		cf := Cf{Cli: conn, Verbose: Verbose}
-
-		tempAppDir, err := cf.generateEmptyApp()
-		defer os.RemoveAll(tempAppDir)
+		// create a client
+		status.Text("Connecting client")
+		client, err := NewClient(conn)
 		if err != nil {
 			return err
 		}
-
-		appName := filepath.Base(tempAppDir)
-		lg("Deploying tunnel", appName)
-		err = cf.pushAppWithoutRoute(appName, tempAppDir)
+		// target space
+		status.Text("Targeting space")
+		space, err := conn.GetCurrentSpace()
+		if err != nil {
+			return err
+		}
+		// create tunnel app
+		status.Text("Deploying", ConduitAppName)
+		appGuid, err := client.CreateApp(ConduitAppName, space.Guid)
+		if err != nil {
+			return err
+		}
 		defer func() {
-			lg("Destroying tunnel", appName)
-			err = cf.forceDeleteAppWithRetries(appName, 3)
-			if err != nil {
-				lg("Run: `cf delete -f", appName, "` to remove artifact manually.")
-				lg("Failed to shutdown cleanly:", err)
-				os.Exit(2)
+			if !ConduitKeepApp {
+				debug("destroying", ConduitAppName, appGuid)
+				if err := client.DestroyApp(appGuid); err != nil {
+					debug("failed to cleanup", ConduitAppName, "app:", err)
+				}
 			}
 		}()
+		// upload bits if not staged
+		status.Text("Uploading", ConduitAppName, "bits")
+		err = client.UploadStaticAppBits(appGuid)
 		if err != nil {
 			return err
 		}
-
-		lg("Getting ID of the temporary app", appName)
-		appGUID, err := cf.getAppGUID(appName)
+		// start app
+		status.Text("Starting", ConduitAppName)
+		err = client.UpdateApp(appGuid, map[string]interface{}{
+			"state": "STARTED",
+		})
 		if err != nil {
 			return err
 		}
-
-		for _, serviceInstanceName := range serviceInstanceNames {
-			lg("Binding service", serviceInstanceName)
-			err = cf.bindService(appName, serviceInstanceName)
-			if err != nil {
-				return err
+		// get service instances
+		status.Text("Fetching service infomation")
+		serviceInstances, err := client.GetServiceInstances()
+		if err != nil {
+			return err
+		}
+		// configure tunnel
+		t := &Tunnel{
+			AppGuid:      appGuid,
+			TunnelAddr:   client.Info.AppSshEndpoint,
+			ForwardAddrs: []ForwardAddrs{},
+			PasswordFunc: func() (string, error) {
+				sshCodeLines, err := conn.CliCommandWithoutTerminalOutput("ssh-code")
+				if err != nil {
+					return "", err
+				}
+				return strings.TrimSpace(strings.Join(sshCodeLines, "")), nil
+			},
+		}
+		// for each service instance
+		localPort := LocalPort
+		for serviceInstanceGuid, serviceInstance := range serviceInstances {
+			for _, name := range serviceInstanceNames {
+				if name != serviceInstance.Name {
+					continue
+				}
+				// bind conduit app to service instance
+				status.Text("Binding", serviceInstance.Name)
+				debug("binding", serviceInstanceGuid, "to", appGuid)
+				creds, err := client.BindService(appGuid, serviceInstanceGuid)
+				if err != nil {
+					return err
+				}
+				// configure the port forwarding
+				debug("creds", creds)
+				localPort++
+				t.ForwardAddrs = append(t.ForwardAddrs, ForwardAddrs{
+					LocalAddr:   fmt.Sprintf("127.0.0.1:%d", localPort),
+					RemoteAddr:  fmt.Sprintf("%s:%d", creds.Host, creds.Port),
+					Credentials: creds,
+				})
 			}
 		}
-
-		lg("Fetching environment")
-		appEnvJSON, err := cf.getAppEnv(appGUID)
+		// check that we bound the correct number of services
+		if len(serviceInstanceNames) != len(t.ForwardAddrs) {
+			return fmt.Errorf("failed to bind all requested services:", serviceInstanceNames)
+		}
+		// fetch the full app env
+		status.Text("Fetching environment")
+		appEnv, err := client.GetAppEnv(appGuid)
 		if err != nil {
 			return err
 		}
-
-		lg("Parsing environment")
-		appEnv := Env{}
-		err = json.Unmarshal([]byte(appEnvJSON), &appEnv)
-		if err != nil {
-			return err
-		}
-
+		// configure the environment
 		runenv := map[string]string{}
-		sshErrs := make(chan error, 1)
-		localPort := LocalPort
-		for serviceName, services := range appEnv.SystemEnvJSON.VcapServices {
-			for i, service := range services {
-				lg("Configuring port forwarding for", serviceName, i)
-				localPort++
-				credentialsIface, ok := service["credentials"]
-				if !ok {
-					return fmt.Errorf("failed to get 'credentials' from VCAP_SERVICES environment")
-				}
-				credentials, ok := credentialsIface.(map[string]interface{})
-				if !ok {
-					return fmt.Errorf(`VCAP_SERVICES[%s][%d]["credentials"] was malformed`, serviceName, i)
-				}
-				portIface, ok := credentials["port"]
-				if !ok {
-					return fmt.Errorf(`VCAP_SERVICES[%s][%d]["credentials"]["port"] was missing`, serviceName, i)
-				}
-				portFloat, ok := portIface.(float64)
-				if !ok {
-					return fmt.Errorf(`VCAP_SERVICES[%s][%d]["credentials"]["port"] was not of type int got %v`, serviceName, i, portIface)
-				}
-				port := int64(portFloat)
-				credentials["port"] = localPort
-				hostIface, ok := credentials["host"]
-				if !ok {
-					return fmt.Errorf(`VCAP_SERVICES[%s][%d]["credentials"]["host"] was missing`, serviceName, i)
-				}
-				host, ok := hostIface.(string)
-				if !ok {
-					return fmt.Errorf(`VCAP_SERVICES[%s][%d]["credentials"]["host"] was not of type string`, serviceName, i)
-				}
-				credentials["host"] = "127.0.0.1"
-				dbnameIface, ok := credentials["name"]
-				if !ok {
-					return fmt.Errorf(`VCAP_SERVICES[%s][%d]["credentials"]["name"] was missing`, serviceName, i)
-				}
-				dbname, ok := dbnameIface.(string)
-				if !ok {
-					return fmt.Errorf(`VCAP_SERVICES[%s][%d]["credentials"]["name"] was not of type string`, serviceName, i)
-				}
-				usernameIface, ok := credentials["username"]
-				if !ok {
-					return fmt.Errorf(`VCAP_SERVICES[%s][%d]["credentials"]["username"] was missing`, serviceName, i)
-				}
-				username, ok := usernameIface.(string)
-				if !ok {
-					return fmt.Errorf(`VCAP_SERVICES[%s][%d]["credentials"]["username"] was not of type string`, serviceName, i)
-				}
-				passwordIface, ok := credentials["password"]
-				if !ok {
-					return fmt.Errorf(`VCAP_SERVICES[%s][%d]["credentials"]["password"] was missing`, serviceName, i)
-				}
-				password, ok := passwordIface.(string)
-				if !ok {
-					return fmt.Errorf(`VCAP_SERVICES[%s][%d]["credentials"]["password"] was not of type string`, serviceName, i)
-				}
+		for serviceName, serviceInstances := range appEnv.SystemEnv.VcapServices {
+			for _, si := range serviceInstances {
+				// modify
+				si.Credentials.Host = "127.0.0.1"
+				si.Credentials.Port = localPort
 				switch serviceName {
 				case "postgres":
-					runenv["PGDATABASE"] = dbname
-					runenv["PGHOST"] = "127.0.0.1"
-					runenv["PGPORT"] = fmt.Sprintf("%d", localPort)
-					runenv["PGUSER"] = username
-					runenv["PGPASSWORD"] = password
+					runenv["PGDATABASE"] = si.Credentials.Name
+					runenv["PGHOST"] = si.Credentials.Host
+					runenv["PGPORT"] = fmt.Sprintf("%d", si.Credentials.Port)
+					runenv["PGUSER"] = si.Credentials.Username
+					runenv["PGPASSWORD"] = si.Credentials.Password
 				case "mysql":
-					mycnfPath := filepath.Join(tempAppDir, "my.cnf")
+					tmpdir, err := ioutil.TempDir("", "conduit")
+					if err != nil {
+						return err
+					}
+					defer os.RemoveAll(tmpdir)
+					mycnfPath := filepath.Join(tmpdir, "my.cnf")
 					mycnf := "[mysql]\n"
-					mycnf += fmt.Sprintf("user = %s\n", username)
-					mycnf += fmt.Sprintf("password = %s\n", password)
-					mycnf += fmt.Sprintf("host = 127.0.0.1\n")
-					mycnf += fmt.Sprintf("port = %d\n", localPort)
-					mycnf += fmt.Sprintf("database = %s\n", dbname)
+					mycnf += fmt.Sprintf("user = %s\n", si.Credentials.Username)
+					mycnf += fmt.Sprintf("password = %s\n", si.Credentials.Password)
+					mycnf += fmt.Sprintf("host = %s\n", si.Credentials.Host)
+					mycnf += fmt.Sprintf("port = %d\n", si.Credentials.Port)
+					mycnf += fmt.Sprintf("database = %s\n", si.Credentials.Name)
 					mycnf += "[mysqldump]\n"
-					mycnf += fmt.Sprintf("user = %s\n", username)
-					mycnf += fmt.Sprintf("password = %s\n", password)
+					mycnf += fmt.Sprintf("user = %s\n", si.Credentials.Username)
+					mycnf += fmt.Sprintf("password = %s\n", si.Credentials.Password)
 					mycnf += fmt.Sprintf("host = 127.0.0.1\n")
 					mycnf += fmt.Sprintf("port = %d\n", localPort)
 					if err := ioutil.WriteFile(mycnfPath, []byte(mycnf), 0644); err != nil {
 						return fmt.Errorf("failed to create temporary mysql config: %s", err)
 					}
-					runenv["MYSQL_HOME"] = tempAppDir
-				}
-
-				ssh, err := cf.sshPortForward(appName, localPort, host, port)
-				if err != nil {
-					return fmt.Errorf("failed to setup port forwarding: %s", err)
-				}
-				err = ssh.Start()
-				if err != nil {
-					return fmt.Errorf("failed to setup port forwarding: %s", err)
-				}
-				go func() {
-					sshErrs <- ssh.Wait()
-				}()
-				select {
-				case err := <-waitForConnection(localPort):
-					if err != nil {
-						return err
-					}
-				case err := <-sshErrs:
-					if err != nil {
-						return err
-					}
+					runenv["MYSQL_HOME"] = tmpdir
 				}
 			}
 		}
-		if b, err := json.Marshal(appEnv.SystemEnvJSON.VcapServices); err != nil {
+		debug("runenv", runenv)
+		// poll for started state
+		status.Text("Waiting for conduit app to become available")
+		err = client.PollForAppState(appGuid, "STARTED", 15)
+		if err != nil {
+			return err
+		}
+		// start the tunnel
+		status.Text("Starting port forwarding")
+		err = t.Start()
+		if err != nil {
+			return err
+		}
+		defer t.Stop()
+		// wait for port forwarding to become active
+		status.Text("Waiting for port forwarding")
+		for _, fwd := range t.ForwardAddrs {
+			select {
+			case err := <-waitForConnection(fwd.LocalAddr):
+				if err != nil {
+					return err
+				}
+			case err := <-t.WaitChan():
+				if err != nil {
+					return err
+				}
+			}
+		}
+		status.Done()
+		// add modified VCAP_SERVICES to environment
+		if b, err := json.Marshal(appEnv.SystemEnv.VcapServices); err != nil {
 			return fmt.Errorf("failed to marshal VCAP_SERVICES: %s", err)
 		} else {
 			runenv["VCAP_SERVICES"] = string(b)
-			fmt.Println(string(b))
+			debug("VCAP_SERVICES", string(b))
 		}
-
+		// render message about ports
 		if Verbose || len(runargs) == 0 {
 			t := template.Must(template.New("tunnelInfo").Parse(tunnelInfo))
 			var out bytes.Buffer
-			t.Execute(&out, appEnv.SystemEnvJSON)
+			t.Execute(&out, appEnv.SystemEnv)
 			fmt.Fprintln(Stderr, out.String())
 		}
-
+		// execute CMD with enviornment
 		runargChan := make(chan struct{})
 		if len(runargs) > 0 {
+			status.Text("Preparing command:", runargs)
 			exe, err := exec.LookPath(runargs[0])
 			if err != nil {
 				return fmt.Errorf("cannot find '%s' in PATH")
@@ -303,7 +307,8 @@ var ConnectService = &cobra.Command{
 			proc.Stdout = Stdout
 			proc.Stdin = Stdin
 			proc.Stderr = Stderr
-			lg("starting", exe)
+			status.Done()
+			debug("running", runargs)
 			if err := proc.Start(); err != nil {
 				return fmt.Errorf("%s: %s", exe, err)
 			}
@@ -311,11 +316,11 @@ var ConnectService = &cobra.Command{
 				defer close(runargChan)
 				proc.Wait()
 			}()
+		} else {
+			fmt.Fprintln(Stderr, "\n\nPress Ctrl+C to shutdown.")
 		}
-
+		// wait
 		select {
-		case err := <-sshErrs:
-			return err
 		case <-shutdown:
 			return nil
 		case <-runargChan:

@@ -1,0 +1,47 @@
+package main
+
+import (
+	"fmt"
+	"io"
+	"time"
+
+	"github.com/briandowns/spinner"
+	"github.com/fatih/color"
+)
+
+func NewStatus(w io.Writer) *Status {
+	s := &Status{
+		spin: spinner.New(spinner.CharSets[14], 250*time.Millisecond),
+	}
+	s.spin.Writer = Stderr
+	s.spin.Prefix = ""
+	s.spin.Suffix = ""
+	return s
+}
+
+type Status struct {
+	spin *spinner.Spinner
+}
+
+func (s *Status) Text(args ...interface{}) {
+	if s.spin.Suffix != "" {
+		s.Done()
+	}
+	msg := fmt.Sprintln(args...)
+	msg = msg[:len(msg)-1]
+	if Verbose || NonInteractive {
+		debug(msg)
+	} else {
+		s.spin.Suffix = " " + msg
+		s.spin.Start()
+	}
+}
+
+func (s *Status) Done() {
+	if s.spin.Suffix != "" {
+		s.spin.FinalMSG = color.GreenString("OK") + s.spin.Suffix + "\n"
+	}
+	s.spin.Stop()
+	s.spin.Suffix = ""
+
+}

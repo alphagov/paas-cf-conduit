@@ -46,11 +46,13 @@ func (p *Plugin) GetMetadata() plugin.PluginMetadata {
 		if cmd.Hidden {
 			continue
 		}
+		opts := map[string]string{}
 		meta.Commands = append(meta.Commands, plugin.Command{
 			Name:     cmd.Name(),
 			HelpText: cmd.Long,
 			UsageDetails: plugin.Usage{
-				Usage: cmd.UsageString(),
+				Usage:   cmd.UsageString(),
+				Options: opts,
 			},
 		})
 	}

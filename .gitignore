@@ -1,2 +1,4 @@
 paas-cf-plugin
 bin
+bindata.go
+vendor

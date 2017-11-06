@@ -2,7 +2,7 @@
 
 ![alt text][logo]
 
-The cloudfoundry cli plugin for that makes it easy to directly connect to your remote service instances.
+The cloudfoundry cli plugin that makes it easy to directly connect to your remote service instances.
  
 ## Features
 
@@ -26,7 +26,7 @@ curl -o /tmp/cf-conduit-plugin http://github.com/alphagov/...release/xxx.darwin.
 cf install-plugin /tmp/cf-conduit-plugin
 ```
 
-or build from source
+or build from source (you will need [dep](https://github.com/golang/dep) and [go-bindata](https://github.com/jteeuwen/go-bindata) installed to build from source)
 
 ```
 git clone git@github.com:alphagov/paas-cf-plugin.git
@@ -104,6 +104,12 @@ Import a postgres dump
 
 ```
 cf conduit pg-instance -- pgsql < backup.sql
+```
+
+Copy data from one instance to another
+
+```
+cf conduit --local-port 7001 pg-1 -- pgsql -c "COPY things TO STDOUT WITH CSV HEADER DELIMITER ','" | cf conduit --local-port 8001 pg-2 -- pgsql -c "COPY things FROM STDIN WITH CSV HEADER DELIMITER ','"
 ```
 
 
