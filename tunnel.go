@@ -1,9 +1,11 @@
 package main
 
 import (
+	"crypto/md5"
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"sync"
 
 	"golang.org/x/crypto/ssh"
@@ -16,13 +18,14 @@ type ForwardAddrs struct {
 }
 
 type Tunnel struct {
-	TunnelAddr   string
-	ForwardAddrs []ForwardAddrs
-	AppGuid      string
-	PasswordFunc func() (string, error)
-	shutdownChan chan struct{}
-	shutdownErr  error
-	listeners    []net.Listener
+	TunnelAddr    string
+	TunnelHostKey string
+	ForwardAddrs  []ForwardAddrs
+	AppGuid       string
+	PasswordFunc  func() (string, error)
+	shutdownChan  chan struct{}
+	shutdownErr   error
+	listeners     []net.Listener
 	sync.Mutex
 }
 
@@ -67,13 +70,25 @@ func (t *Tunnel) forward(fwd ForwardAddrs) (net.Listener, error) {
 					fatal(err)
 				}
 				cfg := &ssh.ClientConfig{
-					User:            "cf:" + t.AppGuid + "/0",
-					Auth:            []ssh.AuthMethod{ssh.Password(password)},
-					HostKeyCallback: ssh.InsecureIgnoreHostKey(), // FIXME
+					User: "cf:" + t.AppGuid + "/0",
+					Auth: []ssh.AuthMethod{ssh.Password(password)},
+					HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+						h := md5.New()
+						if _, err := h.Write(key.Marshal()); err != nil {
+							return err
+						}
+						receivedKey := fmt.Sprintf("%x", h.Sum(nil))
+						expectedKey := strings.Replace(t.TunnelHostKey, ":", "", -1)
+						if receivedKey != expectedKey {
+							return fmt.Errorf("remote hostkey fingerprint '%s' did not match expected value '%s'", receivedKey, expectedKey)
+						}
+						return nil
+					},
 				}
 				debug("ssh: connecting:", cfg.User, t.TunnelAddr, fmt.Sprintf("'%s'", password))
 				sshConn, err := ssh.Dial("tcp", t.TunnelAddr, cfg)
 				if err != nil {
+					debug("ssh: connection attempt failed:", err)
 					return fmt.Errorf("error dialing ssh: %s\n", err)
 				}
 				debug("ssh: connected!:", cfg.User, t.TunnelAddr)

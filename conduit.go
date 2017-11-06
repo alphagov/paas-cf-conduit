@@ -164,9 +164,10 @@ var ConnectService = &cobra.Command{
 		}
 		// configure tunnel
 		t := &Tunnel{
-			AppGuid:      appGuid,
-			TunnelAddr:   client.Info.AppSshEndpoint,
-			ForwardAddrs: []ForwardAddrs{},
+			AppGuid:       appGuid,
+			TunnelAddr:    client.Info.AppSshEndpoint,
+			TunnelHostKey: client.Info.AppSshHostKey,
+			ForwardAddrs:  []ForwardAddrs{},
 			PasswordFunc: func() (string, error) {
 				sshCodeLines, err := conn.CliCommandWithoutTerminalOutput("ssh-code")
 				if err != nil {
