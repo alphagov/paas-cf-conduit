@@ -19,6 +19,8 @@ var (
 	NonInteractive bool
 	ConduitKeepApp bool
 	ConduitAppName string
+	ConduitOrg     string
+	ConduitSpace   string
 	shutdown       chan struct{}
 	fatalshutdown  chan struct{}
 )
@@ -79,8 +81,8 @@ func main() {
 	cmd := &cobra.Command{Use: "cf"}
 	cmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "", false, "verbose output")
 	cmd.PersistentFlags().BoolVarP(&NonInteractive, "no-interactive", "", NonInteractive, "disable progress indicator and status output")
-	// cmd.PersistentFlags().StringVarP(&OrgName, "org", "o", OrgName, "target org (defaults to currently targeted org)")
-	// cmd.PersistentFlags().StringVarP(&SpaceName, "space", "s", SpaceName, "target space (defaults to currently targeted space)")
+	cmd.PersistentFlags().StringVarP(&ConduitOrg, "org", "o", "", "target org (defaults to currently targeted org)")
+	cmd.PersistentFlags().StringVarP(&ConduitSpace, "space", "s", "", "target space (defaults to currently targeted space)")
 	cmd.PersistentFlags().BoolVarP(&ConduitKeepApp, "keep-app", "", false, "speed up multiple invocations of conduit by not destroying the tunnelling app")
 	cmd.PersistentFlags().StringVarP(&ConduitAppName, "app-name", "", fmt.Sprintf("__conduit_%d__", os.Getpid()), "app name to use for tunnelling app (must not exist)")
 	cmd.AddCommand(ConnectService)

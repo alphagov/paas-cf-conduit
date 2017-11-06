@@ -122,9 +122,15 @@ var ConnectService = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		// target space
-		status.Text("Targeting space")
-		space, err := conn.GetCurrentSpace()
+		// get org
+		status.Text("Targeting org", ConduitOrg)
+		org, err := client.GetOrgByName(ConduitOrg)
+		if err != nil {
+			return err
+		}
+		// get space
+		status.Text("Targeting space", ConduitSpace)
+		space, err := client.GetSpaceByName(org.Guid, ConduitSpace)
 		if err != nil {
 			return err
 		}
@@ -158,7 +164,7 @@ var ConnectService = &cobra.Command{
 		}
 		// get service instances
 		status.Text("Fetching service infomation")
-		serviceInstances, err := client.GetServiceInstances()
+		serviceInstances, err := client.GetServiceInstances(fmt.Sprintf("space_guid:%s", space.Guid))
 		if err != nil {
 			return err
 		}
@@ -178,8 +184,9 @@ var ConnectService = &cobra.Command{
 		}
 		// for each service instance
 		localPort := LocalPort
-		for serviceInstanceGuid, serviceInstance := range serviceInstances {
-			for _, name := range serviceInstanceNames {
+		for _, name := range serviceInstanceNames {
+			bound := false
+			for serviceInstanceGuid, serviceInstance := range serviceInstances {
 				if name != serviceInstance.Name {
 					continue
 				}
@@ -198,11 +205,11 @@ var ConnectService = &cobra.Command{
 					RemoteAddr:  fmt.Sprintf("%s:%d", creds.Host, creds.Port),
 					Credentials: creds,
 				})
+				bound = true
 			}
-		}
-		// check that we bound the correct number of services
-		if len(serviceInstanceNames) != len(t.ForwardAddrs) {
-			return fmt.Errorf("failed to bind all requested services:", serviceInstanceNames)
+			if !bound {
+				return fmt.Errorf("failed to bind service: '%s' was not found in space '%s'", name, space.Name)
+			}
 		}
 		// fetch the full app env
 		status.Text("Fetching environment")

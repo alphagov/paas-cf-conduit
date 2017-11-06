@@ -69,6 +69,23 @@ type Credentials struct {
 	Password string `json:"password"`
 }
 
+type Org struct {
+	Guid                string    `json:"guid"`
+	UpdatedAt           time.Time `json:"updated_at"`
+	CreatedAt           time.Time `json:"created_at"`
+	Name                string    `json:"name"`
+	QuotaDefinitionGuid string    `json:"quota_definition_guid"`
+	Status              string    `json:"status"`
+}
+
+type Space struct {
+	Guid      string    `json:"guid"`
+	OrgGuid   string    `json:"organization_guid"`
+	UpdatedAt time.Time `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at"`
+	Name      string    `json:"name"`
+}
+
 func newHttpClient(authEndpoint string, tokenEndpoint string, token string, insecure bool) (*http.Client, error) {
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -178,8 +195,101 @@ func (c *Client) GetAppEnv(appGuid string) (*Env, error) {
 	return &env, nil
 }
 
-func (c *Client) GetServiceInstances() (map[string]*ServiceInstance, error) {
-	resources, err := c.getResources("/v2/service_instances")
+func (c *Client) GetSpaceByName(orgGuid string, name string) (*Space, error) {
+	spaces, err := c.GetSpaces(fmt.Sprintf("name:%s", name), fmt.Sprintf("organization_guid:%s", orgGuid))
+	if err != nil {
+		return nil, err
+	}
+	for _, space := range spaces {
+		if space.Name == name && space.OrgGuid == orgGuid {
+			return space, nil
+		}
+	}
+	return nil, fmt.Errorf("no space named '%s' in org %s", name, orgGuid)
+}
+
+func (c *Client) GetSpaces(filters ...string) (map[string]*Space, error) {
+	uri, err := url.Parse("/v2/spaces")
+	if err != nil {
+		return nil, err
+	}
+	q := uri.Query()
+	for _, filter := range filters {
+		q.Add("q", filter)
+	}
+	uri.RawQuery = q.Encode()
+	resources, err := c.getResources(uri.String())
+	if err != nil {
+		return nil, err
+	}
+	entities := map[string]*Space{}
+	for _, r := range resources {
+		var entity Space
+		err := json.Unmarshal(r.RawEntity, &entity)
+		if err != nil {
+			return nil, err
+		}
+		entity.Guid = r.Metadata.Guid
+		entity.CreatedAt = r.Metadata.CreatedAt
+		entity.UpdatedAt = r.Metadata.UpdatedAt
+		entities[entity.Guid] = &entity
+	}
+	return entities, nil
+}
+
+func (c *Client) GetOrgByName(name string) (*Org, error) {
+	orgs, err := c.GetOrgs(fmt.Sprintf("name:%s", name))
+	if err != nil {
+		return nil, err
+	}
+	for _, org := range orgs {
+		if org.Name == name {
+			return org, nil
+		}
+	}
+	return nil, fmt.Errorf("no org named '%s'", name)
+}
+
+func (c *Client) GetOrgs(filters ...string) (map[string]*Org, error) {
+	uri, err := url.Parse("/v2/organizations")
+	if err != nil {
+		return nil, err
+	}
+	q := uri.Query()
+	for _, filter := range filters {
+		q.Add("q", filter)
+	}
+	uri.RawQuery = q.Encode()
+	resources, err := c.getResources(uri.String())
+	if err != nil {
+		return nil, err
+	}
+	entities := map[string]*Org{}
+	for _, r := range resources {
+		var entity Org
+		err := json.Unmarshal(r.RawEntity, &entity)
+		if err != nil {
+			return nil, err
+		}
+		entity.Guid = r.Metadata.Guid
+		entity.CreatedAt = r.Metadata.CreatedAt
+		entity.UpdatedAt = r.Metadata.UpdatedAt
+		entities[entity.Guid] = &entity
+	}
+	return entities, nil
+}
+
+func (c *Client) GetServiceInstances(filters ...string) (map[string]*ServiceInstance, error) {
+	uri, err := url.Parse("/v2/service_instances")
+	if err != nil {
+		return nil, err
+	}
+	q := uri.Query()
+	for _, filter := range filters {
+		q.Add("q", filter)
+	}
+	uri.RawQuery = q.Encode()
+	resources, err := c.getResources(uri.String())
 	if err != nil {
 		return nil, err
 	}
