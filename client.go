@@ -69,6 +69,14 @@ type Credentials struct {
 	Password string `json:"password"`
 }
 
+type jsonCredentials struct {
+	Host     string      `json:"host"`
+	Port     json.Number `json:"port"`
+	Name     string      `json:"name"`
+	Username string      `json:"username"`
+	Password string      `json:"password"`
+}
+
 type Org struct {
 	Guid                string    `json:"guid"`
 	UpdatedAt           time.Time `json:"updated_at"`
@@ -311,7 +319,7 @@ func (c *Client) GetServiceInstances(filters ...string) (map[string]*ServiceInst
 func (c *Client) BindService(appGuid string, serviceInstanceGuid string) (*Credentials, error) {
 	res := struct {
 		Entity struct {
-			Credentials Credentials `json:"credentials"`
+			Credentials jsonCredentials `json:"credentials"`
 		} `json:"entity"`
 	}{}
 	err := c.fetch("POST", "/v2/service_bindings", map[string]interface{}{
@@ -321,7 +329,15 @@ func (c *Client) BindService(appGuid string, serviceInstanceGuid string) (*Crede
 	if err != nil {
 		return nil, err
 	}
-	return &res.Entity.Credentials, nil
+	port, _ := res.Entity.Credentials.Port.Int64()
+	creds := &Credentials{
+		Host:     res.Entity.Credentials.Host,
+		Port:     port,
+		Name:     res.Entity.Credentials.Name,
+		Username: res.Entity.Credentials.Username,
+		Password: res.Entity.Credentials.Password,
+	}
+	return creds, nil
 
 }
 
