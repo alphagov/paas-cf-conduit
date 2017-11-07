@@ -15,21 +15,19 @@ The cloudfoundry cli plugin that makes it easy to directly connect to your remot
 Install from the plugin repository:
 
 ```
-TODO
+// TODO
 ```
 
 Install from released binary
 
 ```
 // TODO
-curl -o /tmp/cf-conduit-plugin http://github.com/alphagov/...release/xxx.darwin.amd64
-cf install-plugin /tmp/cf-conduit-plugin
 ```
 
 or build from source (you will need [dep](https://github.com/golang/dep) and [go-bindata](https://github.com/jteeuwen/go-bindata) installed to build from source)
 
 ```
-git clone git@github.com:alphagov/paas-cf-plugin.git
+git clone https://github.com:alphagov/paas-cf-plugin
 cd paas-cf-plugin
 make install
 ```
