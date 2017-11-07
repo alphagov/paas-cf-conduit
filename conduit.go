@@ -133,10 +133,11 @@ var ConnectService = &cobra.Command{
 		}
 		defer func() {
 			if ConduitReuse {
-				debug("destroying", ConduitAppName, appGuid)
-				if err := client.DestroyApp(appGuid); err != nil {
-					debug("failed to cleanup", ConduitAppName, "app:", err)
-				}
+				return
+			}
+			debug("destroying", ConduitAppName, appGuid)
+			if err := client.DestroyApp(appGuid); err != nil {
+				debug("failed to cleanup", ConduitAppName, "app:", err)
 			}
 		}()
 		// upload bits if not staged

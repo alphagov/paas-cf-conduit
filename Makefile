@@ -15,7 +15,7 @@ dist: bindata.go vendor
 	mkdir -p bin
 	for arch in $(ALL_ARCH); do \
 		for platform in $(ALL_GOOS); do \
-			GOOS=$$platform ARCH=$$arch $(GOBUILD) -o bin/$(NAME).$$arch.$$platform; \
+			CGO_ENABLED=0 GOOS=$$platform ARCH=$$arch $(GOBUILD) -o bin/$(NAME).$$platform.$$arch; \
 		done; \
 	done
 
