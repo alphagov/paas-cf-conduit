@@ -4,31 +4,40 @@
 
 The cloudfoundry cli plugin that makes it easy to directly connect to your remote service instances.
  
-## Features
+## Overview
 
 * Create tunnels to remote service instances running on cloudfoundry to allow direct access.
-* Enables running local application processes against live service instances by setting up a tunneled VCAP_SERVICES environment.
-* Provides sugar for invocating cli tools for [supported service](#running-database-tools) types.
+* Provides a way to invoke cli tools such as `psql` or `myssqldump` for [supported service](#running-database-tools) types.
+* [_experimental_] Enables running local cloudfoundry application processes against live service instances by setting up a tunneled VCAP_SERVICES environment.
 
 ## Installation
 
-Install from the plugin repository:
+`cf-conduit` is a Cloudfoundry CLI Plugin. Cloudfoundry plugins are binaries that you download and install using the `cf install-plugin` command. For more general information on installing and using Cloudfoundry CLI Plugins please see [Using CF CLI Plugins](https://docs.cloudfoundry.org/cf-cli/use-cli-plugins.html#plugin-install)
+
+To install `cf-conduit` from one of our released binaries:
+
+1. Visit the [releases](https://github.com/alphagov/paas-cf-conduit/releases) page and download the latest binary for your platform. For example if you are on OSX you will liekly want to download the `cf-conduit.darwin.amd64` binary.
+
+2. From a terminal console do:
+3. 
+    ```
+    cf install-plugin ~/Downloads/cf-conduit.darwin.amd64
+    ```
+    
+3. Your plugin should now be installed and you can use via:
+
+    ```
+    cf conduit --help
+    ```
+4. See the [usage](#usage) and [running database tools](#running-database-tools) section for examples.
+
+## Building from source
+
+Alternativly to build from source (you will need [dep](https://github.com/golang/dep) and [go-bindata](https://github.com/jteeuwen/go-bindata) installed to build from source)
 
 ```
-// TODO
-```
-
-Install from released binary
-
-```
-// TODO
-```
-
-or build from source (you will need [dep](https://github.com/golang/dep) and [go-bindata](https://github.com/jteeuwen/go-bindata) installed to build from source)
-
-```
-git clone https://github.com:alphagov/paas-cf-plugin
-cd paas-cf-plugin
+git clone https://github.com:alphagov/paas-cf-conduit $GOPATH/github.com/alphagov/paas-cf-conduit
+cd $GOPATH/github.com/alphagov/paas-cf-conduit
 make install
 ```
 
