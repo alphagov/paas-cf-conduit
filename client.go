@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -334,12 +335,14 @@ func (c *Client) BindService(appGuid string, serviceInstanceGuid string) (*Crede
 }
 
 func (c *Client) UploadStaticAppBits(appGuid string) error {
-	applicationBytes, err := Asset("data/application.zip")
+	buf := new(bytes.Buffer)
+	zipFile := zip.NewWriter(buf)
+	_, err := zipFile.Create("Staticfile")
 	if err != nil {
 		return err
 	}
-	bits := bytes.NewBuffer(applicationBytes)
-	return c.UploadAppBits(appGuid, bits)
+
+	return c.UploadAppBits(appGuid, buf)
 }
 
 func (c *Client) UploadAppBits(appGuid string, bits io.Reader) error {
