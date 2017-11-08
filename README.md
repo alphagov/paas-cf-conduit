@@ -37,7 +37,7 @@ To install `cf-conduit` from one of our released binaries:
 Alternativly to build from source (you will need [dep](https://github.com/golang/dep) and [go-bindata](https://github.com/jteeuwen/go-bindata) installed to build from source)
 
 ```
-git clone https://github.com:alphagov/paas-cf-conduit $GOPATH/github.com/alphagov/paas-cf-conduit
+go get -u -d github.com/alphagov/paas-cf-conduit
 cd $GOPATH/github.com/alphagov/paas-cf-conduit
 make install
 ```
