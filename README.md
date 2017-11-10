@@ -7,7 +7,7 @@ The cloudfoundry cli plugin that makes it easy to directly connect to your remot
 ## Overview
 
 * Create tunnels to remote service instances running on cloudfoundry to allow direct access.
-* Provides a way to invoke cli tools such as `psql` or `myssqldump` for [supported service](#running-database-tools) types.
+* Provides a way to invoke cli tools such as `psql` or `mysqldump` for [supported service](#running-database-tools) types.
 * [_experimental_] Enables running local cloudfoundry application processes against live service instances by setting up a tunneled VCAP_SERVICES environment.
 
 ## Installation
