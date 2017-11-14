@@ -291,7 +291,7 @@ var ConnectService = &cobra.Command{
 			status.Text("Preparing command:", runargs)
 			exe, err := exec.LookPath(runargs[0])
 			if err != nil {
-				return fmt.Errorf("cannot find '%s' in PATH")
+				return fmt.Errorf("cannot find '%s' in PATH", runargs[0])
 			}
 			proc := exec.Command(exe, runargs[1:]...)
 			proc.Env = os.Environ()
