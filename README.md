@@ -3,7 +3,7 @@
 ![alt text][logo]
 
 The cloudfoundry cli plugin that makes it easy to directly connect to your remote service instances.
- 
+
 ## Overview
 
 * Create tunnels to remote service instances running on cloudfoundry to allow direct access.
@@ -19,7 +19,7 @@ To install `cf-conduit` from one of our released binaries:
 1. Visit the [releases](https://github.com/alphagov/paas-cf-conduit/releases) page and download the latest binary for your platform. For example if you are on OSX you will likely want to download the `cf-conduit.darwin.amd64` binary.
 
 2. From a terminal console do:
- 
+
     ```
     cf install-plugin ~/Downloads/cf-conduit.darwin.amd64
     ```
@@ -34,7 +34,7 @@ To install `cf-conduit` from one of our released binaries:
 
 ## Building from source
 
-Alternativly to build from source (you will need [dep](https://github.com/golang/dep)) installed to build from source)
+Alternatively, you can build from source. You'll need Go 1.9 or higher.
 
 ```
 git clone https://github.com:alphagov/paas-cf-conduit $GOPATH/github.com/alphagov/paas-cf-conduit
@@ -76,14 +76,14 @@ For example, if your Ruby based application is located at `/home/myapp/app.rb` a
 
 ```
 cf conduit app-db -- ruby /home/myapp/app.rb
-``` 
+```
 
 Alternativly you could drop yourself into a `bash` shell and work from there:
 
 ```
 cf conduit app-db -- bash
 ...
-bash$ 
+bash$
 ```
 
 ### Running database tools
