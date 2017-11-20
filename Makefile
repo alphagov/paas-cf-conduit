@@ -30,4 +30,4 @@ clean:
 .PHONY: test
 test:
 	go vet
-	go test ./...
+	go test $(go list ./... | grep -v /vendor/)
