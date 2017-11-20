@@ -26,3 +26,8 @@ vendor:
 clean:
 	rm -rf vendor
 	rm -rf bin
+
+.PHONY: test
+test:
+	go vet
+	go test ./...
