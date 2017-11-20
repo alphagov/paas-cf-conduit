@@ -132,7 +132,7 @@ cf conduit mysql-instance -- mysql
 Export mysql data:
 
 ```
-cf conduit mysql-isntance -- mysqldump --all-databases
+cf conduit mysql-instance -- mysqldump --all-databases
 ```
 
 
