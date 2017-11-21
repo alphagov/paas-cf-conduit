@@ -6,8 +6,8 @@ go:
   - master
 
 install:
-  - go get -u github.com/golang/dep/cmd/dep
-  - go get ./...
+  # Prevent default install task that does a `go get -t ./...`
+  - true
 
 script:
   - make test
