@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -296,7 +297,7 @@ var ConnectService = &cobra.Command{
 			proc := exec.Command(exe, runargs[1:]...)
 			proc.Env = os.Environ()
 			for k, v := range runenv {
-				proc.Env = append(proc.Env, fmt.Sprintf("%s=%s", k, v))
+				proc.Env = setEnv(proc.Env, k, v)
 			}
 			proc.Stdout = os.Stdout
 			proc.Stdin = os.Stdin
@@ -321,4 +322,19 @@ var ConnectService = &cobra.Command{
 			return nil
 		}
 	},
+}
+
+func setEnv(env []string, key string, value string) []string {
+	for i, kv := range env {
+		parts := strings.SplitN(kv, "=", 2)
+		if len(parts) < 1 {
+			continue
+		}
+		existingKey := parts[0]
+		if existingKey == key {
+			env[i] = fmt.Sprintf("%s=%s", key, value)
+			return env
+		}
+	}
+	return append(env, fmt.Sprintf("%s=%s", key, value))
 }
