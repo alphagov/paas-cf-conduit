@@ -79,7 +79,7 @@ var ConnectService = &cobra.Command{
   cf conduit mysql-instance -- mysqldump --all-databases > backup.sql
 
   Import a mysql script:
-  cf conduit mysql-instance -- psql < backup.psql
+  cf conduit mysql-instance -- mysql < backup.sql
   `,
 	Short: "enables temporarily binding services to local running processes",
 	Long:  "spawns a temporary application, binds your desired service and creates an ssh tunnel from the application to your local machine enabling communication directly with the remote service.",
