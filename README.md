@@ -120,6 +120,10 @@ Copy data from one instance to another
 cf conduit --local-port 7001 pg-1 -- pgsql -c "COPY things TO STDOUT WITH CSV HEADER DELIMITER ','" | cf conduit --local-port 8001 pg-2 -- pgsql -c "COPY things FROM STDIN WITH CSV HEADER DELIMITER ','"
 ```
 
+Launch a psql shell from Docker for Mac:
+```
+cf conduit pg-instance -- docker run --rm -ti -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGPORT -e PGHOST=docker.for.mac.localhost postgres:9.5-alpine psql
+```
 
 #### mysql, mysqldump & friends
 
