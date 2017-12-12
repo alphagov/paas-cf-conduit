@@ -1,7 +1,7 @@
 
 NAME = cf-conduit
 GOBUILD = go build
-ALL_ARCH = amd64 386
+ALL_GOARCH = amd64 386
 ALL_GOOS = windows linux darwin
 
 .PHONY: install
@@ -12,12 +12,11 @@ install:
 
 .PHONY: dist
 dist:
-	mkdir -p bin
-	for arch in $(ALL_ARCH); do \
-		for platform in $(ALL_GOOS); do \
-			CGO_ENABLED=0 GOOS=$$platform ARCH=$$arch $(GOBUILD) -o bin/$(NAME).$$platform.$$arch; \
-		done; \
-	done
+	$(eval export NAME)
+	$(eval export GOBUILD)
+	$(eval export ALL_GOARCH)
+	$(eval export ALL_GOOS)
+	./dist.sh
 
 .PHONY: clean
 clean:
