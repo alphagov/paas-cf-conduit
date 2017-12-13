@@ -16,21 +16,19 @@ The cloudfoundry cli plugin that makes it easy to directly connect to your remot
 
 To install `cf-conduit` from one of our released binaries:
 
-1. Visit the [releases](https://github.com/alphagov/paas-cf-conduit/releases) page and download the latest binary for your platform. For example if you are on OSX you will likely want to download the `cf-conduit.darwin.amd64` binary.
-
-2. From a terminal console do:
+1. From a terminal console do:
 
     ```
-    cf install-plugin ~/Downloads/cf-conduit.darwin.amd64
+    cf install-plugin conduit
     ```
 
-3. Your plugin should now be installed and you can use via:
+2. Your plugin should now be installed and you can use via:
 
     ```
     cf conduit --help
     ```
 
-4. See the [usage](#usage) and [running database tools](#running-database-tools) section for examples.
+3. See the [usage](#usage) and [running database tools](#running-database-tools) section for examples.
 
 ## Building from source
 
