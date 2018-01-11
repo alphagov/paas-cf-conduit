@@ -119,6 +119,7 @@ cf conduit --local-port 7001 pg-1 -- pgsql -c "COPY things TO STDOUT WITH CSV HE
 ```
 
 Launch a psql shell from Docker for Mac:
+
 ```
 cf conduit pg-instance -- docker run --rm -ti -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGPORT -e PGHOST=docker.for.mac.localhost postgres:9.5-alpine psql
 ```
@@ -131,10 +132,16 @@ Launch a mysql shell:
 cf conduit mysql-instance -- mysql
 ```
 
-Export mysql data:
+Export a mysql database:
 
 ```
-cf conduit mysql-instance -- mysqldump --all-databases
+cf conduit mysql-instance -- mysqldump --all-databases > backup.sql
+```
+
+Import a mysql dump
+
+```
+cf conduit mysql-instance -- mysql < backup.sql
 ```
 
 
