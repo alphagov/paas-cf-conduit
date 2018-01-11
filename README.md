@@ -14,9 +14,9 @@ The cloudfoundry cli plugin that makes it easy to directly connect to your remot
 
 `cf-conduit` is a Cloudfoundry CLI Plugin. Cloudfoundry plugins are binaries that you download and install using the `cf install-plugin` command. For more general information on installing and using Cloudfoundry CLI Plugins please see [Using CF CLI Plugins](https://docs.cloudfoundry.org/cf-cli/use-cli-plugins.html#plugin-install)
 
-To install `cf-conduit` from one of our released binaries:
+To install `cf-conduit`:
 
-1. From a terminal console do:
+1. Run the following code from the command line:
 
     ```
     cf install-plugin conduit
@@ -28,7 +28,7 @@ To install `cf-conduit` from one of our released binaries:
     cf conduit --help
     ```
 
-3. See the [usage](#usage) and [running database tools](#running-database-tools) section for examples.
+See the [usage](#usage) and [running database tools](#running-database-tools) section for examples.
 
 ## Building from source
 
@@ -66,33 +66,16 @@ cf conduit service-1 service-2
 
 Output from the command will report connection details for the tunnel(s) in the foreground, hit Ctrl+C to terminate the connections.
 
-### Running local processes
-
-A `VCAP_SERVICES` environment variable containing binding details for each service conduit is made available to any application given after the `--` on the command line.
-
-For example, if your Ruby based application is located at `/home/myapp/app.rb` and requires access to your `app-db` service instance you could execute it via:
-
-```
-cf conduit app-db -- ruby /home/myapp/app.rb
-```
-
-Alternativly you could drop yourself into a `bash` shell and work from there:
-
-```
-cf conduit app-db -- bash
-...
-bash$
-```
 
 ### Running database tools
 
 There is limited support for some common database service tools. It works by detecting certain service types and setting up the environment so that the tools pickup the service binding details by default.
 
-Currently only [RDS broker](https://github.com/alphagov/paas-rds-broker) provided `postgres` and `mysql` service types are supported.
+Currently only [GOV.UK PaaS RDS broker](https://github.com/alphagov/paas-rds-broker) provided `postgres` and `mysql` service types are supported.
 
 Note: You should only specify a single service-instance when using this method and you must install any required tools on your machine for this to work.
 
-#### psql, pg_dump & friends
+#### Postgres
 
 Launch a psql shell:
 
@@ -124,7 +107,7 @@ Launch a psql shell from Docker for Mac:
 cf conduit pg-instance -- docker run --rm -ti -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGPORT -e PGHOST=docker.for.mac.localhost postgres:9.5-alpine psql
 ```
 
-#### mysql, mysqldump & friends
+#### MySQL
 
 Launch a mysql shell:
 
@@ -144,5 +127,23 @@ Import a mysql dump
 cf conduit mysql-instance -- mysql < backup.sql
 ```
 
+
+### Running local processes
+
+A `VCAP_SERVICES` environment variable containing binding details for each service conduit is made available to any application given after the `--` on the command line.
+
+For example, if your Ruby based application is located at `/home/myapp/app.rb` and requires access to your `app-db` service instance you could execute it via:
+
+```
+cf conduit app-db -- ruby /home/myapp/app.rb
+```
+
+Alternativly you could drop yourself into a `bash` shell and work from there:
+
+```
+cf conduit app-db -- bash
+...
+bash$
+```
 
 [logo]: logo.jpg
