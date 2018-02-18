@@ -92,13 +92,13 @@ cf conduit pg-instance -- pg_dump -f backup.sql
 Import a postgres dump
 
 ```
-cf conduit pg-instance -- pgsql < backup.sql
+cf conduit pg-instance -- psql < backup.sql
 ```
 
 Copy data from one instance to another
 
 ```
-cf conduit --local-port 7001 pg-1 -- pgsql -c "COPY things TO STDOUT WITH CSV HEADER DELIMITER ','" | cf conduit --local-port 8001 pg-2 -- pgsql -c "COPY things FROM STDIN WITH CSV HEADER DELIMITER ','"
+cf conduit --local-port 7001 pg-1 -- psql -c "COPY things TO STDOUT WITH CSV HEADER DELIMITER ','" | cf conduit --local-port 8001 pg-2 -- psql -c "COPY things FROM STDIN WITH CSV HEADER DELIMITER ','"
 ```
 
 Launch a psql shell from Docker for Mac:
