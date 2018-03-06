@@ -118,7 +118,7 @@ cf conduit mysql-instance -- mysql
 Export a mysql database:
 
 ```
-cf conduit mysql-instance -- mysqldump --all-databases > backup.sql
+cf conduit mysql-instance -- mysqldump --result-file backup.sql some_database_name
 ```
 
 Import a mysql dump
