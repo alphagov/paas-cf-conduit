@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"archive/zip"
@@ -20,6 +20,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alphagov/paas-cf-conduit/logging"
 
 	"golang.org/x/oauth2"
 )
@@ -508,7 +510,7 @@ func (c *Client) fetch(method string, apipath string, requestData interface{}, r
 			return err
 		}
 	}
-	debug(method, apipath)
+	logging.Debug(method, apipath)
 	req, err := c.NewRequest(method, apipath, &body)
 	if err != nil {
 		return err

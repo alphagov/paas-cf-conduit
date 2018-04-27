@@ -11,11 +11,11 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 
 	"code.cloudfoundry.org/cli/plugin"
+	"github.com/alphagov/paas-cf-conduit/logging"
 	"github.com/spf13/cobra"
 )
 
 var (
-	Verbose          bool
 	NonInteractive   bool
 	ConduitReuse     bool
 	ConduitAppName   string
@@ -46,19 +46,6 @@ func init() {
 	}()
 }
 
-func fatal(args ...interface{}) {
-	fmt.Fprintln(os.Stderr, args...)
-	close(fatalshutdown)
-	time.Sleep(10 * time.Second)
-	os.Exit(1)
-}
-
-func debug(args ...interface{}) {
-	if Verbose {
-		fmt.Fprintln(os.Stderr, args...)
-	}
-}
-
 func retry(fn func() error) error {
 	delayBetweenRetries := 500 * time.Millisecond
 	maxRetries := 10
@@ -83,7 +70,7 @@ func main() {
 		NonInteractive = true
 	}
 	cmd := &cobra.Command{Use: "cf"}
-	cmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "", false, "verbose output")
+	cmd.PersistentFlags().BoolVarP(&logging.Verbose, "verbose", "", false, "verbose output")
 	cmd.PersistentFlags().BoolVarP(&NonInteractive, "no-interactive", "", NonInteractive, "disable progress indicator and status output")
 	cmd.PersistentFlags().StringVarP(&ConduitOrg, "org", "o", "", "target org (defaults to currently targeted org)")
 	cmd.PersistentFlags().StringVarP(&ConduitSpace, "space", "s", "", "target space (defaults to currently targeted space)")

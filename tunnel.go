@@ -8,13 +8,16 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/alphagov/paas-cf-conduit/client"
+	"github.com/alphagov/paas-cf-conduit/logging"
+
 	"golang.org/x/crypto/ssh"
 )
 
 type ForwardAddrs struct {
 	LocalAddr   string
 	RemoteAddr  string
-	Credentials *Credentials
+	Credentials *client.Credentials
 }
 
 type Tunnel struct {
@@ -39,7 +42,7 @@ func (t *Tunnel) passwordPipe() {
 		for {
 			pass, err := t.PasswordFunc()
 			if err != nil {
-				fatal(err)
+				logging.Fatal(fatalshutdown, err)
 				return
 			}
 			t.passwords <- pass
@@ -70,7 +73,7 @@ func (t *Tunnel) forward(fwd ForwardAddrs) (net.Listener, error) {
 	if err != nil {
 		return nil, err
 	}
-	debug("listening", fwd.LocalAddr)
+	logging.Debug("listening", fwd.LocalAddr)
 	go func() {
 		for {
 			localConn, err := localListener.Accept()
@@ -101,17 +104,17 @@ func (t *Tunnel) forward(fwd ForwardAddrs) (net.Listener, error) {
 						return nil
 					},
 				}
-				debug("ssh: connecting:", cfg.User, t.TunnelAddr, fmt.Sprintf("'%s'", password))
+				logging.Debug("ssh: connecting:", cfg.User, t.TunnelAddr, fmt.Sprintf("'%s'", password))
 				sshConn, err := ssh.Dial("tcp", t.TunnelAddr, cfg)
 				if err != nil {
-					debug("ssh: connection attempt failed:", err)
+					logging.Debug("ssh: connection attempt failed:", err)
 					return fmt.Errorf("error dialing ssh: %s\n", err)
 				}
-				debug("ssh: connected!:", cfg.User, t.TunnelAddr)
-				debug("remote: connecting", fwd)
+				logging.Debug("ssh: connected!:", cfg.User, t.TunnelAddr)
+				logging.Debug("remote: connecting", fwd)
 				remoteConn, err := sshConn.Dial("tcp", fwd.RemoteAddr)
 				if err != nil {
-					debug("remote: connection attempt failed:", err, fwd)
+					logging.Debug("remote: connection attempt failed:", err, fwd)
 					return err
 				}
 				go copyConn(fwd, localConn, remoteConn)
@@ -119,7 +122,7 @@ func (t *Tunnel) forward(fwd ForwardAddrs) (net.Listener, error) {
 				return nil
 			})
 			if err != nil {
-				debug("remote: connection fail", err, fwd)
+				logging.Debug("remote: connection fail", err, fwd)
 				localConn.Close()
 			}
 		}
@@ -158,10 +161,10 @@ func copyConn(fwd ForwardAddrs, dst, src net.Conn) {
 	_, err := io.Copy(dst, src)
 	if err != nil {
 		if err == io.EOF {
-			debug("copy failed: EOF:", fwd)
+			logging.Debug("copy failed: EOF:", fwd)
 			return
 		} else {
-			fatal("io.Copy error", err)
+			logging.Fatal(fatalshutdown, "io.Copy error", err)
 		}
 	}
 }
