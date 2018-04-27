@@ -189,6 +189,14 @@ type Client struct {
 	Info               *Info
 }
 
+func (c *Client) GetNewAccessToken() (string, error) {
+	token, err := c.output("oauth-token")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(strings.TrimPrefix(token, "bearer ")), nil
+}
+
 func (c *Client) GetAppEnv(appGuid string) (*Env, error) {
 	env := Env{}
 	err := c.fetch("GET", "/v2/apps/"+appGuid+"/env", nil, &env)

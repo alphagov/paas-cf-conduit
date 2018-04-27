@@ -68,10 +68,10 @@ var ConnectService = &cobra.Command{
 	Use: "conduit [flags] SERVICE_INSTANCE [-- COMMAND]",
 	Example: `  Create a tunnel between your machine and a remote running service:
   cf conduit my-service
-  
+
   Run a local application that uses VCAP_SERVICES environment to connect to remote services:
   cf conduit my-service-1 my-service-2 -- /path/to/app
-    
+
   Export a postgres database:
   cf conduit postgres-instance -- pg_dump -f backup.sql
 
@@ -140,7 +140,27 @@ var ConnectService = &cobra.Command{
 			}
 			logging.Debug("destroying", ConduitAppName, appGuid)
 			if err := cfClient.DestroyApp(appGuid); err != nil {
-				logging.Debug("failed to cleanup", ConduitAppName, "app:", err)
+				logging.Debug("failed to delete app", ConduitAppName, "err:", err)
+
+				logging.Debug("refreshing auth token")
+				newToken, err := cfClient.GetNewAccessToken()
+				if err != nil {
+					logging.Debug("failed to get new access token, err:", err)
+					fmt.Fprintf(os.Stderr, "failed to delete %s app, please delete it manually\n", ConduitAppName)
+					return
+				}
+				cfClient, err = client.NewClient(ApiEndpoint, newToken, ApiInsecure)
+				if err != nil {
+					logging.Debug("failed to create cf client with new access token, err:", err)
+					fmt.Fprintf(os.Stderr, "failed to delete %s app, please delete it manually\n", ConduitAppName)
+					return
+				}
+
+				if err := cfClient.DestroyApp(appGuid); err != nil {
+					logging.Debug("failed to delete app", ConduitAppName, "err:", err)
+					fmt.Fprintf(os.Stderr, "failed to delete %s app, please delete it manually\n", ConduitAppName)
+					return
+				}
 			}
 		}()
 		// upload bits if not staged
