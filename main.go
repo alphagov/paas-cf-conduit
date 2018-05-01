@@ -26,19 +26,14 @@ var (
 	ApiToken         string
 	ApiInsecure      bool
 	shutdown         chan struct{}
-	fatalshutdown    chan struct{}
 )
 
 func init() {
-	fatalshutdown = make(chan struct{})
 	shutdown = make(chan struct{})
 	go func() {
 		sig := make(chan os.Signal, 3)
 		signal.Notify(sig, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
-		select {
-		case <-sig:
-		case <-fatalshutdown:
-		}
+		<-sig
 		close(shutdown)
 		for range sig {
 			log.Println("...shutting down")

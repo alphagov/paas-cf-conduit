@@ -42,7 +42,7 @@ func (t *Tunnel) passwordPipe() {
 		for {
 			pass, err := t.PasswordFunc()
 			if err != nil {
-				logging.Fatal(fatalshutdown, err)
+				logging.Fatal(err)
 				return
 			}
 			t.passwords <- pass
@@ -164,7 +164,7 @@ func copyConn(fwd ForwardAddrs, dst, src net.Conn) {
 			logging.Debug("copy failed: EOF:", fwd)
 			return
 		} else {
-			logging.Fatal(fatalshutdown, "io.Copy error", err)
+			logging.Fatal("io.Copy error", err)
 		}
 	}
 }
