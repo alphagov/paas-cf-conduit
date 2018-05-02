@@ -32,7 +32,7 @@ func init() {
 	shutdown = make(chan struct{})
 	go func() {
 		sig := make(chan os.Signal, 3)
-		signal.Notify(sig, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
+		signal.Notify(sig, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGHUP)
 		<-sig
 		close(shutdown)
 		for range sig {
