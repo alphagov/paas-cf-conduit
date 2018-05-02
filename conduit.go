@@ -13,6 +13,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/alphagov/paas-cf-conduit/client"
+	"github.com/alphagov/paas-cf-conduit/logging"
+
 	"github.com/spf13/cobra"
 )
 
@@ -44,7 +47,7 @@ func waitForConnection(addr string) chan error {
 				time.Sleep(1 * time.Second)
 			}
 			tries++
-			debug("waiting for", addr, "attempt", tries)
+			logging.Debug("waiting for", addr, "attempt", tries)
 			conn, err := net.DialTimeout("tcp", addr, timeout)
 			if err != nil {
 				if tries < 15 {
@@ -65,10 +68,10 @@ var ConnectService = &cobra.Command{
 	Use: "conduit [flags] SERVICE_INSTANCE [-- COMMAND]",
 	Example: `  Create a tunnel between your machine and a remote running service:
   cf conduit my-service
-  
+
   Run a local application that uses VCAP_SERVICES environment to connect to remote services:
   cf conduit my-service-1 my-service-2 -- /path/to/app
-    
+
   Export a postgres database:
   cf conduit postgres-instance -- pg_dump -f backup.sql
 
@@ -109,25 +112,25 @@ var ConnectService = &cobra.Command{
 		}
 		// create a client
 		status.Text("Connecting client")
-		client, err := NewClient(ApiEndpoint, ApiToken, ApiInsecure)
+		cfClient, err := client.NewClient(ApiEndpoint, ApiToken, ApiInsecure)
 		if err != nil {
 			return err
 		}
 		// get org
 		status.Text("Targeting org", ConduitOrg)
-		org, err := client.GetOrgByName(ConduitOrg)
+		org, err := cfClient.GetOrgByName(ConduitOrg)
 		if err != nil {
 			return err
 		}
 		// get space
 		status.Text("Targeting space", ConduitSpace)
-		space, err := client.GetSpaceByName(org.Guid, ConduitSpace)
+		space, err := cfClient.GetSpaceByName(org.Guid, ConduitSpace)
 		if err != nil {
 			return err
 		}
 		// create tunnel app
 		status.Text("Deploying", ConduitAppName)
-		appGuid, err := client.CreateApp(ConduitAppName, space.Guid)
+		appGuid, err := cfClient.CreateApp(ConduitAppName, space.Guid)
 		if err != nil {
 			return err
 		}
@@ -135,20 +138,40 @@ var ConnectService = &cobra.Command{
 			if ConduitReuse {
 				return
 			}
-			debug("destroying", ConduitAppName, appGuid)
-			if err := client.DestroyApp(appGuid); err != nil {
-				debug("failed to cleanup", ConduitAppName, "app:", err)
+			logging.Debug("destroying", ConduitAppName, appGuid)
+			if err := cfClient.DestroyApp(appGuid); err != nil {
+				logging.Debug("failed to delete app", ConduitAppName, "err:", err)
+
+				logging.Debug("refreshing auth token")
+				newToken, err := cfClient.GetNewAccessToken()
+				if err != nil {
+					logging.Debug("failed to get new access token, err:", err)
+					fmt.Fprintf(os.Stderr, "failed to delete %s app, please delete it manually\n", ConduitAppName)
+					return
+				}
+				cfClient, err = client.NewClient(ApiEndpoint, newToken, ApiInsecure)
+				if err != nil {
+					logging.Debug("failed to create cf client with new access token, err:", err)
+					fmt.Fprintf(os.Stderr, "failed to delete %s app, please delete it manually\n", ConduitAppName)
+					return
+				}
+
+				if err := cfClient.DestroyApp(appGuid); err != nil {
+					logging.Debug("failed to delete app", ConduitAppName, "err:", err)
+					fmt.Fprintf(os.Stderr, "failed to delete %s app, please delete it manually\n", ConduitAppName)
+					return
+				}
 			}
 		}()
 		// upload bits if not staged
 		status.Text("Uploading", ConduitAppName, "bits")
-		err = client.UploadStaticAppBits(appGuid)
+		err = cfClient.UploadStaticAppBits(appGuid)
 		if err != nil {
 			return err
 		}
 		// start app
 		status.Text("Starting", ConduitAppName)
-		err = client.UpdateApp(appGuid, map[string]interface{}{
+		err = cfClient.UpdateApp(appGuid, map[string]interface{}{
 			"state": "STARTED",
 		})
 		if err != nil {
@@ -156,17 +179,17 @@ var ConnectService = &cobra.Command{
 		}
 		// get service instances
 		status.Text("Fetching service infomation")
-		serviceInstances, err := client.GetServiceInstances(fmt.Sprintf("space_guid:%s", space.Guid))
+		serviceInstances, err := cfClient.GetServiceInstances(fmt.Sprintf("space_guid:%s", space.Guid))
 		if err != nil {
 			return err
 		}
 		// configure tunnel
 		t := &Tunnel{
 			AppGuid:       appGuid,
-			TunnelAddr:    client.Info.AppSshEndpoint,
-			TunnelHostKey: client.Info.AppSshHostKey,
+			TunnelAddr:    cfClient.Info.AppSshEndpoint,
+			TunnelHostKey: cfClient.Info.AppSshHostKey,
 			ForwardAddrs:  []ForwardAddrs{},
-			PasswordFunc:  client.SSHCode,
+			PasswordFunc:  cfClient.SSHCode,
 		}
 		// for each service instance
 		localPort := ConduitLocalPort
@@ -178,13 +201,13 @@ var ConnectService = &cobra.Command{
 				}
 				// bind conduit app to service instance
 				status.Text("Binding", serviceInstance.Name)
-				debug("binding", serviceInstanceGuid, "to", appGuid)
-				creds, err := client.BindService(appGuid, serviceInstanceGuid)
+				logging.Debug("binding", serviceInstanceGuid, "to", appGuid)
+				creds, err := cfClient.BindService(appGuid, serviceInstanceGuid)
 				if err != nil {
 					return err
 				}
 				// configure the port forwarding
-				debug("creds", creds)
+				logging.Debug("creds", creds)
 				localPort++
 				t.ForwardAddrs = append(t.ForwardAddrs, ForwardAddrs{
 					LocalAddr:   fmt.Sprintf("127.0.0.1:%d", localPort),
@@ -199,7 +222,7 @@ var ConnectService = &cobra.Command{
 		}
 		// fetch the full app env
 		status.Text("Fetching environment")
-		appEnv, err := client.GetAppEnv(appGuid)
+		appEnv, err := cfClient.GetAppEnv(appGuid)
 		if err != nil {
 			return err
 		}
@@ -242,10 +265,10 @@ var ConnectService = &cobra.Command{
 				}
 			}
 		}
-		debug("runenv", runenv)
+		logging.Debug("runenv", runenv)
 		// poll for started state
 		status.Text("Waiting for conduit app to become available")
-		err = client.PollForAppState(appGuid, "STARTED", 15)
+		err = cfClient.PollForAppState(appGuid, "STARTED", 15)
 		if err != nil {
 			return err
 		}
@@ -276,10 +299,10 @@ var ConnectService = &cobra.Command{
 			return fmt.Errorf("failed to marshal VCAP_SERVICES: %s", err)
 		} else {
 			runenv["VCAP_SERVICES"] = string(b)
-			debug("VCAP_SERVICES", string(b))
+			logging.Debug("VCAP_SERVICES", string(b))
 		}
 		// render message about ports
-		if Verbose || len(runargs) == 0 {
+		if logging.Verbose || len(runargs) == 0 {
 			t := template.Must(template.New("tunnelInfo").Parse(tunnelInfo))
 			var out bytes.Buffer
 			t.Execute(&out, appEnv.SystemEnv)
@@ -302,7 +325,7 @@ var ConnectService = &cobra.Command{
 			proc.Stdin = os.Stdin
 			proc.Stderr = os.Stderr
 			status.Done()
-			debug("running", runargs)
+			logging.Debug("running", runargs)
 			if err := proc.Start(); err != nil {
 				return fmt.Errorf("%s: %s", exe, err)
 			}

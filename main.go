@@ -11,11 +11,11 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 
 	"code.cloudfoundry.org/cli/plugin"
+	"github.com/alphagov/paas-cf-conduit/logging"
 	"github.com/spf13/cobra"
 )
 
 var (
-	Verbose          bool
 	NonInteractive   bool
 	ConduitReuse     bool
 	ConduitAppName   string
@@ -26,37 +26,19 @@ var (
 	ApiToken         string
 	ApiInsecure      bool
 	shutdown         chan struct{}
-	fatalshutdown    chan struct{}
 )
 
 func init() {
-	fatalshutdown = make(chan struct{})
 	shutdown = make(chan struct{})
 	go func() {
 		sig := make(chan os.Signal, 3)
-		signal.Notify(sig, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
-		select {
-		case <-sig:
-		case <-fatalshutdown:
-		}
+		signal.Notify(sig, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGHUP)
+		<-sig
 		close(shutdown)
 		for range sig {
 			log.Println("...shutting down")
 		}
 	}()
-}
-
-func fatal(args ...interface{}) {
-	fmt.Fprintln(os.Stderr, args...)
-	close(fatalshutdown)
-	time.Sleep(10 * time.Second)
-	os.Exit(1)
-}
-
-func debug(args ...interface{}) {
-	if Verbose {
-		fmt.Fprintln(os.Stderr, args...)
-	}
 }
 
 func retry(fn func() error) error {
@@ -83,7 +65,7 @@ func main() {
 		NonInteractive = true
 	}
 	cmd := &cobra.Command{Use: "cf"}
-	cmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "", false, "verbose output")
+	cmd.PersistentFlags().BoolVarP(&logging.Verbose, "verbose", "", false, "verbose output")
 	cmd.PersistentFlags().BoolVarP(&NonInteractive, "no-interactive", "", NonInteractive, "disable progress indicator and status output")
 	cmd.PersistentFlags().StringVarP(&ConduitOrg, "org", "o", "", "target org (defaults to currently targeted org)")
 	cmd.PersistentFlags().StringVarP(&ConduitSpace, "space", "s", "", "target space (defaults to currently targeted space)")

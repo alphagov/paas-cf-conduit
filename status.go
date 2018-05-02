@@ -6,6 +6,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/alphagov/paas-cf-conduit/logging"
+
 	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
 )
@@ -30,8 +32,8 @@ func (s *Status) Text(args ...interface{}) {
 	}
 	msg := fmt.Sprintln(args...)
 	msg = msg[:len(msg)-1]
-	if Verbose || NonInteractive {
-		debug(msg)
+	if logging.Verbose || NonInteractive {
+		logging.Debug(msg)
 	} else {
 		s.spin.Suffix = " " + msg
 		s.spin.Start()
