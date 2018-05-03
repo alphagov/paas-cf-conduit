@@ -1,4 +1,4 @@
-package main
+package util
 
 import (
 	"fmt"
@@ -12,18 +12,20 @@ import (
 	"github.com/fatih/color"
 )
 
-func NewStatus(w io.Writer) *Status {
+type Status struct {
+	spin           *spinner.Spinner
+	nonInteractive bool
+}
+
+func NewStatus(w io.Writer, nonInteractive bool) *Status {
 	s := &Status{
-		spin: spinner.New(spinner.CharSets[14], 250*time.Millisecond),
+		spin:           spinner.New(spinner.CharSets[14], 250*time.Millisecond),
+		nonInteractive: nonInteractive,
 	}
 	s.spin.Writer = os.Stderr
 	s.spin.Prefix = ""
 	s.spin.Suffix = ""
 	return s
-}
-
-type Status struct {
-	spin *spinner.Spinner
 }
 
 func (s *Status) Text(args ...interface{}) {
@@ -32,7 +34,7 @@ func (s *Status) Text(args ...interface{}) {
 	}
 	msg := fmt.Sprintln(args...)
 	msg = msg[:len(msg)-1]
-	if logging.Verbose || NonInteractive {
+	if logging.Verbose || s.nonInteractive {
 		logging.Debug(msg)
 	} else {
 		s.spin.Suffix = " " + msg

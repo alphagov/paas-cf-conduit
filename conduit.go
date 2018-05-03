@@ -16,6 +16,7 @@ import (
 	"github.com/alphagov/paas-cf-conduit/client"
 	"github.com/alphagov/paas-cf-conduit/logging"
 	"github.com/alphagov/paas-cf-conduit/tls"
+	"github.com/alphagov/paas-cf-conduit/util"
 
 	"github.com/spf13/cobra"
 )
@@ -99,7 +100,7 @@ var ConnectService = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// create status writer
-		status := NewStatus(os.Stderr)
+		status := util.NewStatus(os.Stderr, NonInteractive)
 		defer status.Done()
 		// parse args
 		var serviceInstanceNames []string
