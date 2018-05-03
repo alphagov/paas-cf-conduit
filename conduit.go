@@ -15,6 +15,7 @@ import (
 
 	"github.com/alphagov/paas-cf-conduit/client"
 	"github.com/alphagov/paas-cf-conduit/logging"
+	"github.com/alphagov/paas-cf-conduit/tls"
 
 	"github.com/spf13/cobra"
 )
@@ -208,12 +209,21 @@ var ConnectService = &cobra.Command{
 				}
 				// configure the port forwarding
 				logging.Debug("creds", creds)
-				localPort++
-				t.ForwardAddrs = append(t.ForwardAddrs, ForwardAddrs{
-					LocalAddr:   fmt.Sprintf("127.0.0.1:%d", localPort),
+				forwardAddr := ForwardAddrs{
+					LocalPort:   localPort,
 					RemoteAddr:  fmt.Sprintf("%s:%d", creds.Host, creds.Port),
 					Credentials: creds,
-				})
+				}
+				localPort++
+
+				// We need a TLS proxy for the following services which need an extra port
+				if name == "redis" {
+					forwardAddr.LocalTLSPort = localPort
+					localPort++
+				}
+
+				t.ForwardAddrs = append(t.ForwardAddrs, forwardAddr)
+
 				bound = true
 			}
 			if !bound {
@@ -283,7 +293,7 @@ var ConnectService = &cobra.Command{
 		status.Text("Waiting for port forwarding")
 		for _, fwd := range t.ForwardAddrs {
 			select {
-			case err := <-waitForConnection(fwd.LocalAddr):
+			case err := <-waitForConnection(fwd.LocalAddress()):
 				if err != nil {
 					return err
 				}
@@ -293,6 +303,24 @@ var ConnectService = &cobra.Command{
 				}
 			}
 		}
+
+		// Start TLS proxies
+		for _, addr := range t.ForwardAddrs {
+			if addr.LocalTLSPort == 0 {
+				continue
+			}
+
+			tlsTunnel := tls.NewTunnel(addr.LocalTLSAddress(), addr.LocalAddress())
+			_, err := tlsTunnel.Start()
+			if err != nil {
+				return err
+			}
+			err = <-waitForConnection(addr.LocalTLSAddress())
+			if err != nil {
+				return err
+			}
+		}
+
 		status.Done()
 		// add modified VCAP_SERVICES to environment
 		if b, err := json.Marshal(appEnv.SystemEnv.VcapServices); err != nil {

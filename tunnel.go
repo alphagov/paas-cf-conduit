@@ -15,9 +15,25 @@ import (
 )
 
 type ForwardAddrs struct {
-	LocalAddr   string
-	RemoteAddr  string
-	Credentials *client.Credentials
+	LocalPort    int64
+	LocalTLSPort int64
+	RemoteAddr   string
+	Credentials  *client.Credentials
+}
+
+func (f ForwardAddrs) LocalAddress() string {
+	return fmt.Sprintf("localhost:%d", f.LocalPort)
+}
+
+func (f ForwardAddrs) LocalTLSAddress() string {
+	return fmt.Sprintf("localhost:%d", f.LocalTLSPort)
+}
+
+func (f ForwardAddrs) ConnectAddress() string {
+	if f.LocalTLSPort != 0 {
+		return f.LocalTLSAddress()
+	}
+	return f.LocalAddress()
 }
 
 type Tunnel struct {
@@ -69,11 +85,11 @@ func (t *Tunnel) Start() error {
 }
 
 func (t *Tunnel) forward(fwd ForwardAddrs) (net.Listener, error) {
-	localListener, err := net.Listen("tcp", fwd.LocalAddr)
+	localListener, err := net.Listen("tcp", fwd.LocalAddress())
 	if err != nil {
 		return nil, err
 	}
-	logging.Debug("listening", fwd.LocalAddr)
+	logging.Debug("listening", fwd.LocalAddress())
 	go func() {
 		for {
 			localConn, err := localListener.Accept()
