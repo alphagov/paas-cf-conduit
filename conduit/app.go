@@ -19,18 +19,14 @@ import (
 
 const tunnelInfo = `
 The following services are ready for you to connect to:
-
-{{range $serviceName, $services := .VcapServices}}
-	{{range $serviceIndex, $service := $services}}
-		service: {{$service.Name}} ({{$serviceName}})
-		host: {{$service.Credentials.Host}}
-		port: {{$service.Credentials.Port}}
-		username: {{$service.Credentials.Username}}
-		password: {{$service.Credentials.Password}}
-		db: {{$service.Credentials.Name}}
-	{{end}}
-{{end}}
-`
+{{range $serviceName, $services := .VcapServices}}{{range $serviceIndex, $service := $services}}
+  service: {{$service.Name}} ({{$serviceName}})
+  host: {{$service.Credentials.Host}}
+  port: {{$service.Credentials.Port}}
+  username: {{$service.Credentials.Username}}
+  password: {{$service.Credentials.Password}}
+  db: {{$service.Credentials.Name}}
+{{end}}{{end}}`
 
 type App struct {
 	cfClient             *client.Client

@@ -109,7 +109,7 @@ var ConnectService = &cobra.Command{
 				return err
 			}
 		} else {
-			fmt.Fprintln(os.Stderr, "\n\nPress Ctrl+C to shutdown.")
+			fmt.Fprintln(os.Stderr, "\nPress Ctrl+C to shutdown.")
 		}
 
 		// wait
