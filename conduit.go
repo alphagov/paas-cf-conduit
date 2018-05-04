@@ -120,4 +120,5 @@ var ConnectService = &cobra.Command{
 			return nil
 		}
 	},
+	SilenceUsage: true,
 }
