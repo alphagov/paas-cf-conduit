@@ -40,6 +40,7 @@ type App struct {
 type ServiceProvider interface {
 	IsTLSEnabled(creds client.Credentials) bool
 	GetNonTLSClients() []string
+	GetKnownClients() []string
 	InitEnv(creds client.Credentials, env map[string]string) error
 	Teardown() error
 }
@@ -103,6 +104,10 @@ func (a *App) DeployApp() error {
 	}
 
 	if err := a.bindServices(); err != nil {
+		return err
+	}
+
+	if err := a.checkForMatchingService(); err != nil {
 		return err
 	}
 
@@ -210,6 +215,33 @@ func (a *App) bindServices() error {
 	}
 
 	return nil
+}
+
+func (a *App) checkForMatchingService() error {
+	if a.program == "" {
+		return nil
+	}
+
+	validServiceTypes := []string{}
+	for serviceType, serviceProvider := range a.serviceProviders {
+		for _, knownClient := range serviceProvider.GetKnownClients() {
+			if knownClient == a.program {
+				validServiceTypes = append(validServiceTypes, serviceType)
+				if len(a.appEnv.SystemEnv.VcapServices[serviceType]) > 0 {
+					return nil
+				}
+				break
+			}
+		}
+	}
+
+	if len(validServiceTypes) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"%s program expects one of the following service types: %s", a.program, strings.Join(validServiceTypes, ", "),
+	)
 }
 
 func (a *App) initServiceBindings() error {

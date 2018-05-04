@@ -62,3 +62,7 @@ func (m *MySQL) Teardown() error {
 func (m *MySQL) GetNonTLSClients() []string {
 	return []string{}
 }
+
+func (m *MySQL) GetKnownClients() []string {
+	return []string{"mysql", "mysqldump"}
+}

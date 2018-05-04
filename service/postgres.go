@@ -37,3 +37,7 @@ func (p *Postgres) Teardown() error {
 func (p *Postgres) GetNonTLSClients() []string {
 	return []string{}
 }
+
+func (p *Postgres) GetKnownClients() []string {
+	return []string{"psql", "pg_dump"}
+}

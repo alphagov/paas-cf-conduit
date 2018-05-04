@@ -24,3 +24,7 @@ func (r *Redis) Teardown() error {
 func (r *Redis) GetNonTLSClients() []string {
 	return []string{"redis-cli"}
 }
+
+func (r *Redis) GetKnownClients() []string {
+	return []string{"redis-cli"}
+}
