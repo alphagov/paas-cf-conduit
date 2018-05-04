@@ -70,6 +70,8 @@ type Credentials struct {
 	Name     string `json:"name"`
 	Username string `json:"username"`
 	Password string `json:"password"`
+	URI      string `json:"uri"`
+	JDBCURI  string `json:"jdbcuri"`
 }
 
 type jsonCredentials struct {
@@ -78,6 +80,8 @@ type jsonCredentials struct {
 	Name     string      `json:"name"`
 	Username string      `json:"username"`
 	Password string      `json:"password"`
+	URI      string      `json:"uri"`
+	JDBCURI  string      `json:"jdbcuri"`
 }
 
 type Org struct {
@@ -339,6 +343,8 @@ func (c *Client) BindService(appGuid string, serviceInstanceGuid string) (*Crede
 		Name:     res.Entity.Credentials.Name,
 		Username: res.Entity.Credentials.Username,
 		Password: res.Entity.Credentials.Password,
+		URI:      res.Entity.Credentials.URI,
+		JDBCURI:  res.Entity.Credentials.JDBCURI,
 	}
 	return creds, nil
 
