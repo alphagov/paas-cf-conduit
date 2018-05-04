@@ -1,4 +1,4 @@
-package main
+package ssh
 
 import (
 	"crypto/md5"
@@ -10,30 +10,38 @@ import (
 
 	"github.com/alphagov/paas-cf-conduit/client"
 	"github.com/alphagov/paas-cf-conduit/logging"
+	"github.com/alphagov/paas-cf-conduit/util"
 
 	"golang.org/x/crypto/ssh"
 )
 
 type ForwardAddrs struct {
-	LocalPort    int64
-	LocalTLSPort int64
-	RemoteAddr   string
-	Credentials  *client.Credentials
+	LocalPort     int64
+	TLSTunnelPort int64
+	RemoteAddr    string
+	Credentials   *client.Credentials
 }
 
 func (f ForwardAddrs) LocalAddress() string {
 	return fmt.Sprintf("localhost:%d", f.LocalPort)
 }
 
-func (f ForwardAddrs) LocalTLSAddress() string {
-	return fmt.Sprintf("localhost:%d", f.LocalTLSPort)
+func (f ForwardAddrs) TLSTunnelAddress() string {
+	return fmt.Sprintf("localhost:%d", f.TLSTunnelPort)
 }
 
 func (f ForwardAddrs) ConnectAddress() string {
-	if f.LocalTLSPort != 0 {
-		return f.LocalTLSAddress()
+	if f.TLSTunnelPort != 0 {
+		return f.TLSTunnelAddress()
 	}
 	return f.LocalAddress()
+}
+
+func (f ForwardAddrs) ConnectPort() int64 {
+	if f.TLSTunnelPort != 0 {
+		return f.TLSTunnelPort
+	}
+	return f.LocalPort
 }
 
 type Tunnel struct {
@@ -58,8 +66,7 @@ func (t *Tunnel) passwordPipe() {
 		for {
 			pass, err := t.PasswordFunc()
 			if err != nil {
-				logging.Fatal(err)
-				return
+				logging.Error(err)
 			}
 			t.passwords <- pass
 		}
@@ -102,7 +109,7 @@ func (t *Tunnel) forward(fwd ForwardAddrs) (net.Listener, error) {
 			// We try several times to make the connection here to workaround
 			// flakey connections that timeout. Once the connection is established
 			// TCP takes care of keeping it working.
-			err = retry(func() error {
+			err = util.Retry(func() error {
 				password := <-t.passwords
 				cfg := &ssh.ClientConfig{
 					User: "cf:" + t.AppGuid + "/0",
@@ -180,7 +187,7 @@ func copyConn(fwd ForwardAddrs, dst, src net.Conn) {
 			logging.Debug("copy failed: EOF:", fwd)
 			return
 		} else {
-			logging.Fatal("io.Copy error", err)
+			logging.Error("io.Copy error", err)
 		}
 	}
 }
