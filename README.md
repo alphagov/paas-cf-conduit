@@ -127,6 +127,19 @@ Import a mysql dump
 cf conduit mysql-instance -- mysql < backup.sql
 ```
 
+#### Redis
+
+Launch a Redis shell:
+
+```
+cf conduit redis-instance -- redis-cli
+```
+
+Run a Redis command:
+
+```
+cf conduit redis-instance -- redis-cli get mykey
+```
 
 ### Running local processes
 
