@@ -34,3 +34,7 @@ func (p *Postgres) InitEnv(creds *client.Credentials, env map[string]string) err
 func (p *Postgres) Teardown() error {
 	return nil
 }
+
+func (p *Postgres) GetNonTLSClients() []string {
+	return []string{}
+}

@@ -20,3 +20,7 @@ func (r *Redis) InitEnv(creds *client.Credentials, env map[string]string) error 
 func (r *Redis) Teardown() error {
 	return nil
 }
+
+func (r *Redis) GetNonTLSClients() []string {
+	return []string{"redis-cli"}
+}

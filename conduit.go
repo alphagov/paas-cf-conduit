@@ -70,9 +70,9 @@ var ConnectService = &cobra.Command{
 		}
 
 		app := conduit.NewApp(
-			cfClient, status, ConduitLocalPort,
-			ConduitOrg, ConduitSpace, ConduitAppName, !ConduitReuse,
-			serviceInstanceNames,
+			cfClient, status,
+			ConduitLocalPort, ConduitOrg, ConduitSpace, ConduitAppName, !ConduitReuse,
+			serviceInstanceNames, runargs,
 		)
 
 		app.RegisterServiceProvider("mysql", &service.MySQL{})
@@ -105,7 +105,7 @@ var ConnectService = &cobra.Command{
 
 		finish := make(chan struct{})
 		if len(runargs) > 0 {
-			if err := app.RunCommand(runargs, finish); err != nil {
+			if err := app.RunCommand(finish); err != nil {
 				return err
 			}
 		} else {

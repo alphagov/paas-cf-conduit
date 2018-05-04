@@ -59,3 +59,7 @@ func (m *MySQL) Teardown() error {
 	}
 	return nil
 }
+
+func (m *MySQL) GetNonTLSClients() []string {
+	return []string{}
+}

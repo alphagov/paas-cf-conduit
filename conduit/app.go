@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/alphagov/paas-cf-conduit/client"
 	"github.com/alphagov/paas-cf-conduit/logging"
@@ -34,12 +35,14 @@ The following services are ready for you to connect to:
 type App struct {
 	cfClient             *client.Client
 	status               *util.Status
-	localPort            int64
+	nextPort             int64
 	orgName              string
 	spaceName            string
 	appName              string
 	deleteApp            bool
 	serviceInstanceNames []string
+	runArgs              []string
+	program              string
 	org                  *client.Org
 	space                *client.Space
 	appGUID              string
@@ -53,6 +56,7 @@ type App struct {
 
 type ServiceProvider interface {
 	IsTLSEnabled(creds *client.Credentials) bool
+	GetNonTLSClients() []string
 	InitEnv(creds *client.Credentials, env map[string]string) error
 	Teardown() error
 }
@@ -66,16 +70,23 @@ func NewApp(
 	appName string,
 	deleteApp bool,
 	serviceInstanceNames []string,
+	runArgs []string,
 ) *App {
+	var program string
+	if len(runArgs) > 0 {
+		program = runArgs[0]
+	}
 	return &App{
 		cfClient:             cfClient,
 		status:               status,
-		localPort:            localPort,
+		nextPort:             localPort,
 		orgName:              orgName,
 		spaceName:            spaceName,
 		appName:              appName,
 		deleteApp:            deleteApp,
 		serviceInstanceNames: serviceInstanceNames,
+		runArgs:              runArgs,
+		program:              program,
 		serviceProviders:     make(map[string]ServiceProvider),
 		runEnv:               make(map[string]string),
 		forwardAddrs:         make([]ssh.ForwardAddrs, 0),
@@ -115,34 +126,6 @@ func (a *App) DeployApp() error {
 	if err := a.initServiceBindings(); err != nil {
 		return err
 	}
-
-	return nil
-}
-
-func (a *App) RunCommand(runargs []string, finish chan struct{}) error {
-	// execute CMD with environment
-	a.status.Text("Preparing command:", runargs)
-	exe, err := exec.LookPath(runargs[0])
-	if err != nil {
-		return fmt.Errorf("cannot find '%s' in PATH", runargs[0])
-	}
-	proc := exec.Command(exe, runargs[1:]...)
-	proc.Env = os.Environ()
-	for k, v := range a.runEnv {
-		proc.Env = append(proc.Env, fmt.Sprintf("%s=%s", k, v))
-	}
-	proc.Stdout = os.Stdout
-	proc.Stdin = os.Stdin
-	proc.Stderr = os.Stderr
-	a.status.Done()
-	logging.Debug("running", runargs)
-	if err := proc.Start(); err != nil {
-		return fmt.Errorf("%s: %s", exe, err)
-	}
-	go func() {
-		defer close(finish)
-		proc.Wait()
-	}()
 
 	return nil
 }
@@ -244,19 +227,26 @@ func (a *App) bindServices() error {
 }
 
 func (a *App) initServiceBindings() error {
-	port := a.localPort
 	for serviceName, serviceInstances := range a.appEnv.SystemEnv.VcapServices {
 		for _, si := range serviceInstances {
 			if serviceProvider, ok := a.serviceProviders[serviceName]; ok {
 				forwardAddr := ssh.ForwardAddrs{
 					RemoteAddr: fmt.Sprintf("%s:%d", si.Credentials.Host, si.Credentials.Port),
-					LocalPort:  port,
+					LocalPort:  a.nextPort,
 				}
-				port++
+				a.nextPort++
 
-				if serviceName == "redis" {
-					forwardAddr.TLSTunnelPort = port
-					port++
+				createTLSTunnel := false
+				for _, nonTLSClient := range serviceProvider.GetNonTLSClients() {
+					if nonTLSClient == a.program {
+						createTLSTunnel = true
+						break
+					}
+				}
+
+				if serviceName == "redis" && serviceProvider.IsTLSEnabled(si.Credentials) && createTLSTunnel {
+					forwardAddr.TLSTunnelPort = a.nextPort
+					a.nextPort++
 				}
 
 				a.forwardAddrs = append(a.forwardAddrs, forwardAddr)
@@ -355,6 +345,62 @@ func (a *App) startTLSTunnels() error {
 		}
 	}
 
+	return nil
+}
+
+func (a *App) RunCommand(finish chan struct{}) error {
+	// execute CMD with environment
+	a.status.Text("Preparing command:", strings.Join(a.runArgs, " "))
+
+	extraArgs := a.getProgramSpecificArgs(a.program)
+	runArgs := append([]string{a.program}, extraArgs...)
+	runArgs = append(runArgs, a.runArgs[1:]...)
+
+	exe, err := exec.LookPath(a.program)
+	if err != nil {
+		return fmt.Errorf("cannot find '%s' in PATH", a.program)
+	}
+
+	logging.Debug("running command", exe, strings.Join(runArgs[1:], " "))
+
+	proc := exec.Command(exe, runArgs[1:]...)
+	proc.Env = os.Environ()
+	for k, v := range a.runEnv {
+		proc.Env = append(proc.Env, fmt.Sprintf("%s=%s", k, v))
+	}
+	proc.Stdout = os.Stdout
+	proc.Stdin = os.Stdin
+	proc.Stderr = os.Stderr
+
+	a.status.Done()
+
+	if err := proc.Start(); err != nil {
+		return fmt.Errorf("%s: %s", exe, err)
+	}
+	go func() {
+		defer close(finish)
+		proc.Wait()
+	}()
+
+	return nil
+}
+
+func (a *App) getProgramSpecificArgs(program string) []string {
+	switch program {
+	case "redis-cli":
+		serviceInstances, ok := a.appEnv.SystemEnv.VcapServices["redis"]
+		if !ok {
+			return nil
+		}
+		if len(serviceInstances) == 0 {
+			return nil
+		}
+		return []string{
+			"-h", serviceInstances[0].Credentials.Host,
+			"-p", fmt.Sprintf("%d", serviceInstances[0].Credentials.Port),
+			"-a", serviceInstances[0].Credentials.Password,
+		}
+	}
 	return nil
 }
 
