@@ -247,8 +247,7 @@ func (a *App) initServiceBindings() error {
 
 				a.forwardAddrs = append(a.forwardAddrs, forwardAddr)
 
-				si.Credentials.Host = "127.0.0.1"
-				si.Credentials.Port = forwardAddr.ConnectPort()
+				si.Credentials.SetAddress("127.0.0.1", forwardAddr.ConnectPort())
 
 				serviceProvider.InitEnv(si.Credentials, a.runEnv)
 			}

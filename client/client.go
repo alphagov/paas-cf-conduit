@@ -74,6 +74,15 @@ type Credentials struct {
 	JDBCURI  string `json:"jdbcuri"`
 }
 
+func (c *Credentials) SetAddress(host string, port int64) {
+	oldAddr := fmt.Sprintf("%s:%d", c.Host, c.Port)
+	newAddr := fmt.Sprintf("%s:%d", host, port)
+	c.URI = strings.Replace(c.URI, oldAddr, newAddr, 1)
+	c.JDBCURI = strings.Replace(c.JDBCURI, oldAddr, newAddr, 1)
+	c.Host = host
+	c.Port = port
+}
+
 type jsonCredentials struct {
 	Host     string      `json:"host"`
 	Port     json.Number `json:"port"`
