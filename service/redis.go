@@ -9,11 +9,11 @@ import (
 type Redis struct {
 }
 
-func (r *Redis) IsTLSEnabled(creds *client.Credentials) bool {
-	return strings.HasPrefix(creds.URI, "rediss")
+func (r *Redis) IsTLSEnabled(creds client.Credentials) bool {
+	return creds.IsTLSEnabled() || strings.HasPrefix(creds.URI(), "rediss")
 }
 
-func (r *Redis) InitEnv(creds *client.Credentials, env map[string]string) error {
+func (r *Redis) InitEnv(creds client.Credentials, env map[string]string) error {
 	return nil
 }
 

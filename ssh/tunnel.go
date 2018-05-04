@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alphagov/paas-cf-conduit/client"
 	"github.com/alphagov/paas-cf-conduit/logging"
 	"github.com/alphagov/paas-cf-conduit/util"
 
@@ -19,7 +18,6 @@ type ForwardAddrs struct {
 	LocalPort     int64
 	TLSTunnelPort int64
 	RemoteAddr    string
-	Credentials   *client.Credentials
 }
 
 func (f ForwardAddrs) LocalAddress() string {

@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/alphagov/paas-cf-conduit/client"
 	"github.com/alphagov/paas-cf-conduit/logging"
@@ -16,11 +15,11 @@ type MySQL struct {
 	serviceCnt int
 }
 
-func (m *MySQL) IsTLSEnabled(creds *client.Credentials) bool {
-	return strings.Contains(creds.URI, "ssl=true") || strings.Contains(creds.JDBCURI, "ssl=true")
+func (m *MySQL) IsTLSEnabled(creds client.Credentials) bool {
+	return creds.IsTLSEnabled()
 }
 
-func (m *MySQL) InitEnv(creds *client.Credentials, env map[string]string) error {
+func (m *MySQL) InitEnv(creds client.Credentials, env map[string]string) error {
 	// We will only set the configuration for the first service
 	if m.serviceCnt > 0 {
 		return nil
@@ -33,16 +32,16 @@ func (m *MySQL) InitEnv(creds *client.Credentials, env map[string]string) error 
 	}
 	mycnfPath := filepath.Join(m.workDir, "my.cnf")
 	mycnf := "[mysql]\n"
-	mycnf += fmt.Sprintf("user = %s\n", creds.Username)
-	mycnf += fmt.Sprintf("password = %s\n", creds.Password)
-	mycnf += fmt.Sprintf("host = %s\n", creds.Host)
-	mycnf += fmt.Sprintf("port = %d\n", creds.Port)
-	mycnf += fmt.Sprintf("database = %s\n", creds.Name)
+	mycnf += fmt.Sprintf("user = %s\n", creds.Username())
+	mycnf += fmt.Sprintf("password = %s\n", creds.Password())
+	mycnf += fmt.Sprintf("host = %s\n", creds.Host())
+	mycnf += fmt.Sprintf("port = %d\n", creds.Port())
+	mycnf += fmt.Sprintf("database = %s\n", creds.Database())
 	mycnf += "[mysqldump]\n"
-	mycnf += fmt.Sprintf("user = %s\n", creds.Username)
-	mycnf += fmt.Sprintf("password = %s\n", creds.Password)
-	mycnf += fmt.Sprintf("host = %s\n", creds.Host)
-	mycnf += fmt.Sprintf("port = %d\n", creds.Port)
+	mycnf += fmt.Sprintf("user = %s\n", creds.Username())
+	mycnf += fmt.Sprintf("password = %s\n", creds.Password())
+	mycnf += fmt.Sprintf("host = %s\n", creds.Host())
+	mycnf += fmt.Sprintf("port = %d\n", creds.Port())
 	if err := ioutil.WriteFile(mycnfPath, []byte(mycnf), 0644); err != nil {
 		return fmt.Errorf("failed to create temporary mysql config: %s", err)
 	}

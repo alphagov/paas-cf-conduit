@@ -1,10 +1,8 @@
 package conduit
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"os"
 	"os/exec"
 	"strings"
@@ -16,17 +14,6 @@ import (
 	"github.com/alphagov/paas-cf-conduit/util"
 	"github.com/cloudfoundry/multierror"
 )
-
-const tunnelInfo = `
-The following services are ready for you to connect to:
-{{range $serviceName, $services := .VcapServices}}{{range $serviceIndex, $service := $services}}
-  service: {{$service.Name}} ({{$serviceName}})
-  host: {{$service.Credentials.Host}}
-  port: {{$service.Credentials.Port}}
-  username: {{$service.Credentials.Username}}
-  password: {{$service.Credentials.Password}}
-  db: {{$service.Credentials.Name}}
-{{end}}{{end}}`
 
 type App struct {
 	cfClient             *client.Client
@@ -51,9 +38,9 @@ type App struct {
 }
 
 type ServiceProvider interface {
-	IsTLSEnabled(creds *client.Credentials) bool
+	IsTLSEnabled(creds client.Credentials) bool
 	GetNonTLSClients() []string
-	InitEnv(creds *client.Credentials, env map[string]string) error
+	InitEnv(creds client.Credentials, env map[string]string) error
 	Teardown() error
 }
 
@@ -201,9 +188,12 @@ func (a *App) bindServices() error {
 			// bind conduit app to service instance
 			a.status.Text("Binding", serviceInstance.Name)
 			logging.Debug("binding", serviceInstanceGUID, "to", a.appGUID)
-			_, err := a.cfClient.BindService(a.appGUID, serviceInstanceGUID)
+			creds, err := a.cfClient.BindService(a.appGUID, serviceInstanceGUID)
 			if err != nil {
 				return err
+			}
+			if creds.Host() == "" || creds.Port() == 0 {
+				return fmt.Errorf("%s service is missing host, hostname or port", name)
 			}
 			bound = true
 		}
@@ -227,7 +217,7 @@ func (a *App) initServiceBindings() error {
 		for _, si := range serviceInstances {
 			if serviceProvider, ok := a.serviceProviders[serviceName]; ok {
 				forwardAddr := ssh.ForwardAddrs{
-					RemoteAddr: fmt.Sprintf("%s:%d", si.Credentials.Host, si.Credentials.Port),
+					RemoteAddr: fmt.Sprintf("%s:%d", si.Credentials.Host(), si.Credentials.Port()),
 					LocalPort:  a.nextPort,
 				}
 				a.nextPort++
@@ -268,11 +258,14 @@ func (a *App) initServiceBindings() error {
 }
 
 func (a *App) PrintConnectionInfo() {
-	// render message about ports
-	t := template.Must(template.New("tunnelInfo").Parse(tunnelInfo))
-	var out bytes.Buffer
-	t.Execute(&out, a.appEnv.SystemEnv)
-	fmt.Fprintln(os.Stderr, out.String())
+	fmt.Fprintf(os.Stderr, "\nThe following services are ready for you to connect to:\n\n")
+	for serviceType, serviceInstances := range a.appEnv.SystemEnv.VcapServices {
+		for _, si := range serviceInstances {
+			fmt.Fprintf(os.Stderr, "* service: %s (%s)\n", si.Name, serviceType)
+			si.Credentials.Fprint(os.Stderr, "  ")
+			fmt.Fprintln(os.Stderr)
+		}
+	}
 }
 
 func (a *App) SetupTunnels() error {
@@ -391,9 +384,9 @@ func (a *App) getProgramSpecificArgs(program string) []string {
 			return nil
 		}
 		return []string{
-			"-h", serviceInstances[0].Credentials.Host,
-			"-p", fmt.Sprintf("%d", serviceInstances[0].Credentials.Port),
-			"-a", serviceInstances[0].Credentials.Password,
+			"-h", serviceInstances[0].Credentials.Host(),
+			"-p", fmt.Sprintf("%d", serviceInstances[0].Credentials.Port()),
+			"-a", serviceInstances[0].Credentials.Password(),
 		}
 	}
 	return nil
