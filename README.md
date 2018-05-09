@@ -2,17 +2,17 @@
 
 ![alt text][logo]
 
-The cloudfoundry cli plugin that makes it easy to directly connect to your remote service instances.
+The Cloud Foundry cli plugin that makes it easy to directly connect to your remote service instances.
 
 ## Overview
 
-* Create tunnels to remote service instances running on cloudfoundry to allow direct access.
+* Create tunnels to remote service instances running on Cloud Foundry to allow direct access.
 * Provides a way to invoke cli tools such as `psql` or `mysqldump` for [supported service](#running-database-tools) types.
-* [_experimental_] Enables running local cloudfoundry application processes against live service instances by setting up a tunneled VCAP_SERVICES environment.
+* [_experimental_] Enables running local Cloud Foundry application processes against live service instances by setting up a tunneled VCAP_SERVICES environment.
 
 ## Installation
 
-`cf-conduit` is a Cloudfoundry CLI Plugin. Cloudfoundry plugins are binaries that you download and install using the `cf install-plugin` command. For more general information on installing and using Cloudfoundry CLI Plugins please see [Using CF CLI Plugins](https://docs.cloudfoundry.org/cf-cli/use-cli-plugins.html#plugin-install)
+`cf-conduit` is a Cloud Foundry CLI Plugin. Cloud Foundry plugins are binaries that you download and install using the `cf install-plugin` command. For more general information on installing and using Cloud Foundry CLI Plugins please see [Using CF CLI Plugins](https://docs.cloudfoundry.org/cf-cli/use-cli-plugins.html#plugin-install)
 
 To install `cf-conduit`:
 
@@ -52,7 +52,7 @@ cf conduit --help
 
 ### Creating tunnels
 
-To tunnel a connection from your cloudfoundry hosted service instance to your local machine:
+To tunnel a connection from your Cloud Foundry hosted service instance to your local machine:
 
 ```
 cf conduit my-service-instance
@@ -127,6 +127,19 @@ Import a mysql dump
 cf conduit mysql-instance -- mysql < backup.sql
 ```
 
+#### Redis
+
+Launch a Redis shell:
+
+```
+cf conduit redis-instance -- redis-cli
+```
+
+Run a Redis command:
+
+```
+cf conduit redis-instance -- redis-cli get mykey
+```
 
 ### Running local processes
 
@@ -138,7 +151,7 @@ For example, if your Ruby based application is located at `/home/myapp/app.rb` a
 cf conduit app-db -- ruby /home/myapp/app.rb
 ```
 
-Alternativly you could drop yourself into a `bash` shell and work from there:
+Alternatively you could drop yourself into a `bash` shell and work from there:
 
 ```
 cf conduit app-db -- bash

@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"golang.org/x/crypto/ssh/terminal"
 
@@ -39,23 +38,6 @@ func init() {
 			log.Println("...shutting down")
 		}
 	}()
-}
-
-func retry(fn func() error) error {
-	delayBetweenRetries := 500 * time.Millisecond
-	maxRetries := 10
-	try := 0
-	for {
-		try++
-		err := fn()
-		if err == nil {
-			return nil
-		}
-		if try > maxRetries {
-			return err
-		}
-		time.Sleep(delayBetweenRetries)
-	}
 }
 
 func main() {

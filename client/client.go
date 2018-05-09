@@ -61,23 +61,7 @@ type SystemEnv struct {
 
 type VcapService struct {
 	Name        string
-	Credentials *Credentials
-}
-
-type Credentials struct {
-	Host     string `json:"host"`
-	Port     int64  `json:"port"`
-	Name     string `json:"name"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-type jsonCredentials struct {
-	Host     string      `json:"host"`
-	Port     json.Number `json:"port"`
-	Name     string      `json:"name"`
-	Username string      `json:"username"`
-	Password string      `json:"password"`
+	Credentials credentials
 }
 
 type Org struct {
@@ -319,10 +303,10 @@ func (c *Client) GetServiceInstances(filters ...string) (map[string]*ServiceInst
 	return services, nil
 }
 
-func (c *Client) BindService(appGuid string, serviceInstanceGuid string) (*Credentials, error) {
+func (c *Client) BindService(appGuid string, serviceInstanceGuid string) (Credentials, error) {
 	res := struct {
 		Entity struct {
-			Credentials jsonCredentials `json:"credentials"`
+			Credentials credentials `json:"credentials"`
 		} `json:"entity"`
 	}{}
 	err := c.fetch("POST", "/v2/service_bindings", map[string]interface{}{
@@ -332,15 +316,7 @@ func (c *Client) BindService(appGuid string, serviceInstanceGuid string) (*Crede
 	if err != nil {
 		return nil, err
 	}
-	port, _ := res.Entity.Credentials.Port.Int64()
-	creds := &Credentials{
-		Host:     res.Entity.Credentials.Host,
-		Port:     port,
-		Name:     res.Entity.Credentials.Name,
-		Username: res.Entity.Credentials.Username,
-		Password: res.Entity.Credentials.Password,
-	}
-	return creds, nil
+	return res.Entity.Credentials, nil
 
 }
 
