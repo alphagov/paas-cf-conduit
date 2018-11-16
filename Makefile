@@ -4,10 +4,13 @@ GOBUILD = go build
 ALL_GOARCH = amd64 386
 ALL_GOOS = windows linux darwin
 
-.PHONY: install
-install:
+.PHONY: build
+build:
 	mkdir -p bin
 	$(GOBUILD) -o bin/$(NAME)
+
+.PHONY: install
+install: build
 	cf install-plugin -f bin/$(NAME)
 
 .PHONY: dist
