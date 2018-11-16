@@ -180,7 +180,7 @@ func (t *Tunnel) Stop() error {
 }
 
 func (t *Tunnel) startKeepalive(user string, sshConnection *ssh.Client) {
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 	for {
 		<-ticker.C
