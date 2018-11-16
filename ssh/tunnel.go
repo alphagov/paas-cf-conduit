@@ -21,6 +21,8 @@ type ForwardAddrs struct {
 	RemoteAddr    string
 }
 
+const keepaliveName = "keepalive@github.com/alphagov/paas-cf-conduit"
+
 func (f ForwardAddrs) LocalAddress() string {
 	return fmt.Sprintf("localhost:%d", f.LocalPort)
 }
@@ -184,7 +186,6 @@ func (t *Tunnel) startKeepalive(user string, sshConnection *ssh.Client) {
 	defer ticker.Stop()
 	for {
 		<-ticker.C
-		keepaliveName := "keepalive@github.com/alphagov/paas-cf-conduit"
 		if _, _, err := sshConnection.SendRequest(keepaliveName, true, nil); err != nil {
 			logging.Debug("failed to send keepalive message", user, t.TunnelAddr)
 			return
