@@ -7,6 +7,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/alphagov/paas-cf-conduit/logging"
 	"github.com/alphagov/paas-cf-conduit/util"
@@ -19,6 +20,8 @@ type ForwardAddrs struct {
 	TLSTunnelPort int64
 	RemoteAddr    string
 }
+
+const keepaliveName = "keepalive@github.com/alphagov/paas-cf-conduit"
 
 func (f ForwardAddrs) LocalAddress() string {
 	return fmt.Sprintf("localhost:%d", f.LocalPort)
@@ -132,6 +135,7 @@ func (t *Tunnel) forward(fwd ForwardAddrs) (net.Listener, error) {
 					return fmt.Errorf("error dialing ssh: %s\n", err)
 				}
 				logging.Debug("ssh: connected!:", cfg.User, t.TunnelAddr)
+				go t.startKeepalive(cfg.User, sshConn)
 				logging.Debug("remote: connecting", fwd)
 				remoteConn, err := sshConn.Dial("tcp", fwd.RemoteAddr)
 				if err != nil {
@@ -175,6 +179,18 @@ func (t *Tunnel) Stop() error {
 		t.shutdownChan = nil
 	}
 	return nil
+}
+
+func (t *Tunnel) startKeepalive(user string, sshConnection *ssh.Client) {
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+	for {
+		<-ticker.C
+		if _, _, err := sshConnection.SendRequest(keepaliveName, true, nil); err != nil {
+			logging.Debug("failed to send keepalive message", user, t.TunnelAddr)
+			return
+		}
+	}
 }
 
 // proxy traffic between localConn and remoteConn
