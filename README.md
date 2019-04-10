@@ -36,7 +36,7 @@ Alternatively, you can build from source. You'll need Go 1.9 or higher.
 
 ```
 go get -u -d github.com/alphagov/paas-cf-conduit
-cd $GOPATH/github.com/alphagov/paas-cf-conduit
+cd $GOPATH/src/github.com/alphagov/paas-cf-conduit
 make install
 ```
 
