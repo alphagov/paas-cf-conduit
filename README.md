@@ -32,7 +32,7 @@ See the [usage](#usage) and [running database tools](#running-database-tools) se
 
 ## Building from source
 
-Alternatively, you can build from source. You'll need Go 1.9 or higher.
+Alternatively, you can build from source. You'll need Go 1.13 or higher.
 
 ```
 go get -u -d github.com/alphagov/paas-cf-conduit
