@@ -1,7 +1,6 @@
 package ssh
 
 import (
-	"crypto/md5"
 	"fmt"
 	"io"
 	"net"
@@ -116,15 +115,15 @@ func (t *Tunnel) forward(fwd ForwardAddrs) (net.Listener, error) {
 					User: "cf:" + t.AppGuid + "/0",
 					Auth: []ssh.AuthMethod{ssh.Password(password)},
 					HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-						h := md5.New()
-						if _, err := h.Write(key.Marshal()); err != nil {
-							return err
+						valid, possible := checkSSHFingerprint(key, t.TunnelHostKey)
+
+						if !valid {
+							return fmt.Errorf(
+								"remote hostkey fingerprint %q did not match any possible values %q",
+								t.TunnelHostKey, possible,
+							)
 						}
-						receivedKey := fmt.Sprintf("%x", h.Sum(nil))
-						expectedKey := strings.Replace(t.TunnelHostKey, ":", "", -1)
-						if receivedKey != expectedKey {
-							return fmt.Errorf("remote hostkey fingerprint '%s' did not match expected value '%s'", receivedKey, expectedKey)
-						}
+
 						return nil
 					},
 				}
@@ -204,4 +203,39 @@ func copyConn(fwd ForwardAddrs, dst, src net.Conn) {
 			logging.Error("io.Copy error", err)
 		}
 	}
+}
+
+func checkSSHFingerprint(expected ssh.PublicKey, actual string) (
+	bool, []string,
+) {
+	actualWithoutColons := strings.Replace(actual, ":", "", -1)
+
+	// sha256 fingerprints are base64 encoded, the ssh package prepends SHA256:
+	// so we have to remove it
+	// https://tools.ietf.org/html/rfc4648#section-3.2
+	// https://github.com/golang/crypto/blob/master/ssh/keys.go#L1099
+	sha256Sum := strings.Replace(
+		ssh.FingerprintSHA256(expected),
+		"SHA256:", "", -1,
+	)
+
+	// md5 fingerprints are hex encoded with colons between every byte
+	md5Sum := strings.Replace(
+		strings.Replace(ssh.FingerprintLegacyMD5(expected), "MD5:", "", -1),
+		":", "", -1,
+	)
+
+	possibleVals := []string{sha256Sum, md5Sum}
+
+	sha256Match := sha256Sum == actualWithoutColons
+	md5Match := md5Sum == actualWithoutColons
+
+	match := sha256Match || md5Match
+
+	logging.Debug(fmt.Sprintf(
+		"Fingerprint: [Match: %t ; Expected: %q ; Actual: %q ]",
+		match, possibleVals, actualWithoutColons,
+	))
+
+	return match, possibleVals
 }
