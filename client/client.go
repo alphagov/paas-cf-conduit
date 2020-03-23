@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/gob"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +23,7 @@ import (
 	"time"
 
 	"github.com/alphagov/paas-cf-conduit/logging"
+	gocfclient "github.com/cloudfoundry-community/go-cfclient"
 
 	"golang.org/x/oauth2"
 )
@@ -150,23 +152,33 @@ func NewClient(api string, token string, insecure bool) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	clientConfig := &gocfclient.Config{
+		ApiAddress: api,
+		Token:      strings.TrimPrefix(token, "bearer "),
+	}
+	cf, _ := gocfclient.NewClient(clientConfig)
+
 	httpClient, err := newHttpClient(info.AuthEndpoint, info.TokenEndpoint, token, insecure)
 	if err != nil {
 		return nil, err
 	}
+
 	c := &Client{
 		HttpClient:         httpClient,
+		CFClient:           cf,
 		ApiEndpoint:        api,
 		InsecureSkipVerify: insecure,
 		Info:               info,
 		Token:              token,
 	}
+
 	return c, nil
 }
 
 type Client struct {
 	Verbose            bool
 	HttpClient         *http.Client
+	CFClient           gocfclient.CloudFoundryClient
 	ApiEndpoint        string
 	InsecureSkipVerify bool
 	Token              string
@@ -183,10 +195,17 @@ func (c *Client) GetNewAccessToken() (string, error) {
 
 func (c *Client) GetAppEnv(appGuid string) (*Env, error) {
 	env := Env{}
-	err := c.fetch("GET", "/v2/apps/"+appGuid+"/env", nil, &env)
+	req := c.CFClient.NewRequest("GET", "/v2/apps/"+appGuid+"/env")
+	resp, err := c.CFClient.DoRequest(req)
 	if err != nil {
 		return nil, err
 	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	json.Unmarshal(body, &env)
+
 	return &env, nil
 }
 
@@ -678,4 +697,15 @@ func (c *Client) SSHCode() (string, error) {
 	}
 
 	return codes[0], nil
+}
+
+func getBytes(key interface{}) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(key)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+
 }
