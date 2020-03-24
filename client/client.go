@@ -175,7 +175,7 @@ func NewClient(api string, token string, insecure bool) (*Client, error) {
 type Client struct {
 	Verbose            bool
 	HttpClient         *http.Client
-	CFClient           gocfclient.CloudFoundryClient
+	CFClient           *gocfclient.Client
 	ApiEndpoint        string
 	InsecureSkipVerify bool
 	Token              string
@@ -237,7 +237,7 @@ func (c *Client) GetServiceInstances(filters ...string) (map[string]*gocfclient.
 	}
 
 	for i, instance := range instances {
-		svcInstanceMap[instance.Guid] = &instances[i];
+		svcInstanceMap[instance.Guid] = &instances[i]
 	}
 
 	return svcInstanceMap, nil
@@ -259,7 +259,7 @@ func (c *Client) BindService(appGuid string, serviceInstanceGuid string) (Creden
 		return nil, err
 	}
 
-	req := c.CFClient.NewRequestWithBody("POST", "/v2/service_bindings", 	bytes.NewReader(bodyJson))
+	req := c.CFClient.NewRequestWithBody("POST", "/v2/service_bindings", bytes.NewReader(bodyJson))
 	resp, err := c.CFClient.DoRequest(req)
 	if err != nil {
 		return nil, err
@@ -291,7 +291,9 @@ func (c *Client) UploadStaticAppBits(appGuid string) error {
 }
 
 func (c *Client) DestroyApp(appGuid string) error {
-	return c.fetch("DELETE", "/v3/apps/"+appGuid, nil, nil)
+	req := c.CFClient.NewRequest("DELETE", "/v3/apps/"+appGuid)
+	_, err := c.CFClient.DoRequest(req)
+	return err
 }
 
 func (c *Client) CreateApp(name string, spaceGUID string) (guid string, err error) {
