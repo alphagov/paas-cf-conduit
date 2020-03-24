@@ -242,7 +242,7 @@ func (c *Client) GetServiceInstances(filters ...string) (map[string]*gocfclient.
 	for i, instance := range instances {
 		svcInstanceMap[instance.Guid] = &instances[i];
 	}
-	
+
 	return svcInstanceMap, nil
 }
 
@@ -252,13 +252,32 @@ func (c *Client) BindService(appGuid string, serviceInstanceGuid string) (Creden
 			Credentials credentials `json:"credentials"`
 		} `json:"entity"`
 	}{}
-	err := c.fetch("POST", "/v2/service_bindings", map[string]interface{}{
+
+	body := map[string]interface{}{
 		"app_guid":              appGuid,
 		"service_instance_guid": serviceInstanceGuid,
-	}, &res)
+	}
+	bodyJson, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
+
+	req := c.CFClient.NewRequestWithBody("POST", "/v2/service_bindings", 	bytes.NewReader(bodyJson))
+	resp, err := c.CFClient.DoRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	respBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(respBytes, &res)
+	if err != nil {
+		return nil, err
+	}
+
 	return res.Entity.Credentials, nil
 
 }
