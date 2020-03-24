@@ -135,7 +135,7 @@ func (a *App) deployApp() error {
 	}
 	// start app
 	a.status.Text("Starting", a.appName)
-	if err := a.cfClient.UpdateApp(a.appGUID, map[string]interface{}{"state": "STARTED"}); err != nil {
+	if err := a.cfClient.StartApp(a.appGUID); err != nil {
 		return err
 	}
 

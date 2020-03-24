@@ -317,28 +317,23 @@ func (c *Client) CreateApp(name string, spaceGUID string) (guid string, err erro
 	return app.Guid, nil
 }
 
-func (c *Client) UpdateApp(appGuid string, req map[string]interface{}) error {
-	res := resource{}
-	return c.fetch("PUT", "/v2/apps/"+appGuid, req, &res)
+func (c *Client) StartApp(appGuid string) error {
+	return c.CFClient.StartApp(appGuid)
 }
 
 func (c *Client) PollForAppState(appGuid string, state string, maxRetries int) error {
-	res := struct {
-		State string `json:"state"`
-	}{}
-	method := "GET"
-	uri := "/v3/apps/" + appGuid
 	tries := 0
 	for {
-		if err := c.fetch(method, uri, nil, &res); err != nil {
+		app, err := c.CFClient.GetAppByGuid(appGuid)
+		if err != nil {
 			return err
 		}
-		if res.State == state {
+		if app.State == state {
 			return nil
 		}
 		tries++
 		if tries > maxRetries {
-			return fmt.Errorf("timeout waiting for %s %s to return %s state", method, uri, state)
+			return fmt.Errorf("timeout waiting for GET app %s to return %s state", app.Guid, state)
 		}
 		time.Sleep(1 * time.Second)
 	}
