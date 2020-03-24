@@ -297,25 +297,24 @@ func (c *Client) DestroyApp(appGuid string) error {
 }
 
 func (c *Client) CreateApp(name string, spaceGUID string) (guid string, err error) {
-	req := map[string]interface{}{
-		"name":              name,
-		"space_guid":        spaceGUID,
-		"enable_ssh":        true,
-		"instances":         1,
-		"memory":            64,
-		"disk_quota":        256,
-		"buildpack":         "staticfile_buildpack",
-		"health_check_type": "none",
-		"diego":             true,
+	req := gocfclient.AppCreateRequest{
+		Name:            name,
+		SpaceGuid:       spaceGUID,
+		EnableSSH:       true,
+		Instances:       1,
+		Memory:          64,
+		DiskQuota:       256,
+		Buildpack:       "staticfile_buildpack",
+		HealthCheckType: "none",
+		Diego:           true,
 	}
-	res := resource{}
-	if err := c.fetch("POST", "/v2/apps", req, &res); err != nil {
+
+	app, err := c.CFClient.CreateApp(req)
+	if err != nil {
 		return "", err
 	}
-	if res.Metadata.Guid == "" {
-		return "", fmt.Errorf("assertion failure: expected an app guid returned after CreateApp")
-	}
-	return res.Metadata.Guid, nil
+
+	return app.Guid, nil
 }
 
 func (c *Client) UpdateApp(appGuid string, req map[string]interface{}) error {
