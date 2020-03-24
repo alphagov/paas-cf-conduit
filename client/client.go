@@ -219,35 +219,6 @@ func (c *Client) GetSpaceByName(orgGuid string, name string) (*gocfclient.Space,
 	return &space, err
 }
 
-func (c *Client) GetSpaces(filters ...string) (map[string]*Space, error) {
-	uri, err := url.Parse("/v2/spaces")
-	if err != nil {
-		return nil, err
-	}
-	q := uri.Query()
-	for _, filter := range filters {
-		q.Add("q", filter)
-	}
-	uri.RawQuery = q.Encode()
-	resources, err := c.getResources(uri.String())
-	if err != nil {
-		return nil, err
-	}
-	entities := map[string]*Space{}
-	for _, r := range resources {
-		var entity Space
-		err := json.Unmarshal(r.RawEntity, &entity)
-		if err != nil {
-			return nil, err
-		}
-		entity.Guid = r.Metadata.Guid
-		entity.CreatedAt = r.Metadata.CreatedAt
-		entity.UpdatedAt = r.Metadata.UpdatedAt
-		entities[entity.Guid] = &entity
-	}
-	return entities, nil
-}
-
 func (c *Client) GetOrgByName(name string) (*Org, error) {
 	orgs, err := c.GetOrgs(fmt.Sprintf("name:%s", name))
 	if err != nil {
