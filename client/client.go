@@ -8,18 +8,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/alphagov/paas-cf-conduit/logging"
 	gocfclient "github.com/cloudfoundry-community/go-cfclient"
 
 	"golang.org/x/oauth2"
@@ -339,155 +335,6 @@ func (c *Client) PollForAppState(appGuid string, state string, maxRetries int) e
 	}
 }
 
-func (c *Client) NewRequest(method string, apipath string, body io.Reader) (*http.Request, error) {
-	uri := c.ApiEndpoint + apipath
-	return http.NewRequest(method, uri, body)
-}
-
-func (c *Client) Do(req *http.Request) (*http.Response, error) {
-	return c.HttpClient.Do(req)
-}
-
-func (c *Client) getResources(path string) ([]resource, error) {
-	resultsPerPage := 50
-	pages := make(chan *page, 10)
-	// get first page
-	var p page
-	err := c.fetch("GET", set(path, 1, resultsPerPage), nil, &p)
-	if err != nil {
-		return nil, err
-	}
-	// extact total number of pages
-	totalPages := p.TotalPages
-	pages <- &p
-	// fill channel with requests for rest of pages
-	errs := make(chan error)
-	var wg sync.WaitGroup
-	if totalPages > 1 {
-		for i := 2; i < totalPages+1; i++ {
-			wg.Add(1)
-			go func(uri string) {
-				defer wg.Done()
-				var p page
-				err := c.fetch("GET", uri, nil, &p)
-				if err != nil {
-					errs <- err
-					return
-				}
-				pages <- &p
-			}(set(path, i, resultsPerPage))
-		}
-	}
-	go func() {
-		wg.Wait()
-		close(pages)
-		close(errs)
-	}()
-	// collect errors
-	es := []error{}
-	for err := range errs {
-		es = append(es, err)
-	}
-	if len(es) > 0 {
-		return nil, err
-	}
-	// collect resources
-	resources := []resource{}
-	for p := range pages {
-		resources = append(resources, p.Resources...)
-	}
-	return resources, nil
-}
-
-func (c *Client) fetch(method string, apipath string, requestData interface{}, resposneData interface{}) error {
-	var body bytes.Buffer
-	if method == "POST" || method == "PUT" {
-		err := json.NewEncoder(&body).Encode(requestData)
-		if err != nil {
-			return err
-		}
-	}
-	logging.Debug(method, apipath)
-	req, err := c.NewRequest(method, apipath, &body)
-	if err != nil {
-		return err
-	}
-	res, err := c.Do(req)
-	if err != nil {
-		return err
-	}
-	if res.StatusCode < 200 || res.StatusCode > 202 {
-		resBody, _ := ioutil.ReadAll(res.Body)
-		return fmt.Errorf("%s %s: request failed with status %d: %s", req.Method, apipath, res.StatusCode, string(resBody))
-	}
-	if resposneData != nil {
-		if res.Body == nil {
-			return fmt.Errorf("%s %s: request failed with status %d and no response body", req.Method, apipath, res.StatusCode)
-		}
-		if err := json.NewDecoder(res.Body).Decode(&resposneData); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *Client) pushAppWithoutRoute(appName string, appDir string) error {
-	return c.run("push", appName,
-		"-p", appDir,
-		"-b", "staticfile_buildpack",
-		"-m", "64M",
-		"-k", "64M",
-		"-i", "1",
-		"--health-check-type", "none",
-		"--no-route",
-		"--no-manifest",
-	)
-}
-
-func (c *Client) getAppGUID(appName string) (string, error) {
-	appGUIDLines, err := c.output("app", "--guid", appName)
-	if err != nil {
-		return "", err
-	}
-	appGUID := strings.TrimSpace(appGUIDLines)
-	if appGUID == "" {
-		return "", fmt.Errorf("Expected app ID for '%s' was empty.", appName)
-	}
-	return appGUID, nil
-}
-
-func (c *Client) getAppEnv(appGUID string) (string, error) {
-	return c.output("curl", "/v2/apps/"+appGUID+"/env")
-}
-
-func (c *Client) bindService(appName string, serviceInstanceName string) error {
-	return c.run("bind-service", appName, serviceInstanceName)
-}
-
-func (c *Client) forceDeleteApp(appName string) error {
-	return c.run("delete", "-f", appName)
-}
-
-func (c *Client) forceDeleteAppWithRetries(appName string, tries int) (err error) {
-	for try := 0; try < tries; try++ {
-		err = c.forceDeleteApp(appName)
-		if err == nil {
-			return nil
-		}
-		time.Sleep(1 * time.Second)
-	}
-	return err
-}
-
-func (c *Client) sshPortForward(appName string, localPort int64, remoteHost string, remotePort int64) (*exec.Cmd, error) {
-	portSpec := fmt.Sprintf("%d:%s:%d",
-		localPort,
-		remoteHost,
-		remotePort,
-	)
-	return c.newCommand("ssh", appName, "-L", portSpec, "-N")
-}
-
 func (c *Client) output(args ...string) (string, error) {
 	cmd, err := c.newCommand(args...)
 	if err != nil {
@@ -498,14 +345,6 @@ func (c *Client) output(args ...string) (string, error) {
 		return "", err
 	}
 	return string(b), nil
-}
-
-func (c *Client) run(args ...string) error {
-	cmd, err := c.newCommand(args...)
-	if err != nil {
-		return err
-	}
-	return cmd.Run()
 }
 
 func (c *Client) newCommand(args ...string) (*exec.Cmd, error) {
@@ -519,20 +358,6 @@ func (c *Client) newCommand(args ...string) (*exec.Cmd, error) {
 	cmd.Stdout = nil
 	cmd.Env = os.Environ()
 	return cmd, nil
-}
-
-func set(path string, n int, limit int) string {
-	page, err := url.Parse(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-	q := page.Query()
-	q.Set("page", fmt.Sprintf("%d", n))
-	if limit > 0 {
-		q.Set("results-per-page", fmt.Sprintf("%d", limit))
-	}
-	page.RawQuery = q.Encode()
-	return page.String()
 }
 
 func (c *Client) SSHCode() (string, error) {
