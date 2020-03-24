@@ -228,35 +228,6 @@ func (c *Client) GetOrgByName(name string) (*gocfclient.Org, error) {
 	return &org, nil
 }
 
-func (c *Client) GetOrgs(filters ...string) (map[string]*Org, error) {
-	uri, err := url.Parse("/v2/organizations")
-	if err != nil {
-		return nil, err
-	}
-	q := uri.Query()
-	for _, filter := range filters {
-		q.Add("q", filter)
-	}
-	uri.RawQuery = q.Encode()
-	resources, err := c.getResources(uri.String())
-	if err != nil {
-		return nil, err
-	}
-	entities := map[string]*Org{}
-	for _, r := range resources {
-		var entity Org
-		err := json.Unmarshal(r.RawEntity, &entity)
-		if err != nil {
-			return nil, err
-		}
-		entity.Guid = r.Metadata.Guid
-		entity.CreatedAt = r.Metadata.CreatedAt
-		entity.UpdatedAt = r.Metadata.UpdatedAt
-		entities[entity.Guid] = &entity
-	}
-	return entities, nil
-}
-
 func (c *Client) GetServiceInstances(filters ...string) (map[string]*ServiceInstance, error) {
 	uri, err := url.Parse("/v2/service_instances")
 	if err != nil {
