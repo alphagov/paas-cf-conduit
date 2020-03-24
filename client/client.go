@@ -219,17 +219,13 @@ func (c *Client) GetSpaceByName(orgGuid string, name string) (*gocfclient.Space,
 	return &space, err
 }
 
-func (c *Client) GetOrgByName(name string) (*Org, error) {
-	orgs, err := c.GetOrgs(fmt.Sprintf("name:%s", name))
+func (c *Client) GetOrgByName(name string) (*gocfclient.Org, error) {
+	org, err := c.CFClient.GetOrgByName(name)
+
 	if err != nil {
 		return nil, err
 	}
-	for _, org := range orgs {
-		if org.Name == name {
-			return org, nil
-		}
-	}
-	return nil, fmt.Errorf("no org named '%s'", name)
+	return &org, nil
 }
 
 func (c *Client) GetOrgs(filters ...string) (map[string]*Org, error) {

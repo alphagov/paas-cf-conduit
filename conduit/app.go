@@ -28,7 +28,7 @@ type App struct {
 	serviceInstanceNames []string
 	runArgs              []string
 	program              string
-	org                  *client.Org
+	org                  *gocfclient.Org
 	space                *gocfclient.Space
 	appGUID              string
 	appEnv               *client.Env
