@@ -17,8 +17,6 @@ import (
 	"time"
 
 	gocfclient "github.com/cloudfoundry-community/go-cfclient"
-
-	"golang.org/x/oauth2"
 )
 
 type Metadata struct {
@@ -89,33 +87,6 @@ type ServiceInstance struct {
 	// Plan            *ServicePlan      `json:"-"`
 }
 
-func newHttpClient(authEndpoint string, tokenEndpoint string, token string, insecure bool) (*http.Client, error) {
-	client := &http.Client{
-		Transport: &http.Transport{
-			Proxy:                 http.DefaultTransport.(*http.Transport).Proxy,
-			TLSHandshakeTimeout:   http.DefaultTransport.(*http.Transport).TLSHandshakeTimeout,
-			ExpectContinueTimeout: http.DefaultTransport.(*http.Transport).ExpectContinueTimeout,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: insecure,
-			},
-		},
-	}
-	authConfig := &oauth2.Config{
-		ClientID: "cf",
-		Scopes:   []string{""},
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  authEndpoint + "/oauth/auth",
-			TokenURL: tokenEndpoint + "/oauth/token",
-		},
-	}
-	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, client)
-	tokenSource := authConfig.TokenSource(ctx, &oauth2.Token{
-		AccessToken: strings.TrimPrefix(token, "bearer "),
-		TokenType:   "Bearer",
-	})
-	return oauth2.NewClient(ctx, tokenSource), nil
-}
-
 func getInfo(api string, insecure bool) (*Info, error) {
 	httpClient := &http.Client{
 		Transport: &http.Transport{
@@ -145,19 +116,14 @@ func NewClient(api string, token string, insecure bool) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	clientConfig := &gocfclient.Config{
 		ApiAddress: api,
 		Token:      strings.TrimPrefix(token, "bearer "),
 	}
 	cf, _ := gocfclient.NewClient(clientConfig)
 
-	httpClient, err := newHttpClient(info.AuthEndpoint, info.TokenEndpoint, token, insecure)
-	if err != nil {
-		return nil, err
-	}
-
 	c := &Client{
-		HttpClient:         httpClient,
 		CFClient:           cf,
 		ApiEndpoint:        api,
 		InsecureSkipVerify: insecure,
@@ -170,7 +136,6 @@ func NewClient(api string, token string, insecure bool) (*Client, error) {
 
 type Client struct {
 	Verbose            bool
-	HttpClient         *http.Client
 	CFClient           *gocfclient.Client
 	ApiEndpoint        string
 	InsecureSkipVerify bool
