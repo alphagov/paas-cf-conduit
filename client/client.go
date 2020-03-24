@@ -209,17 +209,14 @@ func (c *Client) GetAppEnv(appGuid string) (*Env, error) {
 	return &env, nil
 }
 
-func (c *Client) GetSpaceByName(orgGuid string, name string) (*Space, error) {
-	spaces, err := c.GetSpaces(fmt.Sprintf("name:%s", name), fmt.Sprintf("organization_guid:%s", orgGuid))
+func (c *Client) GetSpaceByName(orgGuid string, name string) (*gocfclient.Space, error) {
+	space, err := c.CFClient.GetSpaceByName(name, orgGuid)
+
 	if err != nil {
 		return nil, err
 	}
-	for _, space := range spaces {
-		if space.Name == name && space.OrgGuid == orgGuid {
-			return space, nil
-		}
-	}
-	return nil, fmt.Errorf("no space named '%s' in org %s", name, orgGuid)
+
+	return &space, err
 }
 
 func (c *Client) GetSpaces(filters ...string) (map[string]*Space, error) {

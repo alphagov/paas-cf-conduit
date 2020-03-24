@@ -13,6 +13,8 @@ import (
 	"github.com/alphagov/paas-cf-conduit/tls"
 	"github.com/alphagov/paas-cf-conduit/util"
 	"github.com/cloudfoundry/multierror"
+
+	gocfclient "github.com/cloudfoundry-community/go-cfclient"
 )
 
 type App struct {
@@ -27,7 +29,7 @@ type App struct {
 	runArgs              []string
 	program              string
 	org                  *client.Org
-	space                *client.Space
+	space                *gocfclient.Space
 	appGUID              string
 	appEnv               *client.Env
 	serviceProviders     map[string]ServiceProvider
