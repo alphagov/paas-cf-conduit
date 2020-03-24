@@ -228,33 +228,22 @@ func (c *Client) GetOrgByName(name string) (*gocfclient.Org, error) {
 	return &org, nil
 }
 
-func (c *Client) GetServiceInstances(filters ...string) (map[string]*ServiceInstance, error) {
-	uri, err := url.Parse("/v2/service_instances")
+func (c *Client) GetServiceInstances(filters ...string) (map[string]*gocfclient.ServiceInstance, error) {
+	svcInstanceMap := map[string]*gocfclient.ServiceInstance{}
+
+	instances, err := c.CFClient.ListServiceInstancesByQuery(url.Values{
+		"q": filters,
+	})
+
 	if err != nil {
-		return nil, err
+		return svcInstanceMap, err
 	}
-	q := uri.Query()
-	for _, filter := range filters {
-		q.Add("q", filter)
+
+	for i, instance := range instances {
+		svcInstanceMap[instance.Guid] = &instances[i];
 	}
-	uri.RawQuery = q.Encode()
-	resources, err := c.getResources(uri.String())
-	if err != nil {
-		return nil, err
-	}
-	services := map[string]*ServiceInstance{}
-	for _, r := range resources {
-		var service ServiceInstance
-		err := json.Unmarshal(r.RawEntity, &service)
-		if err != nil {
-			return nil, err
-		}
-		service.Guid = r.Metadata.Guid
-		service.CreatedAt = r.Metadata.CreatedAt
-		service.UpdatedAt = r.Metadata.UpdatedAt
-		services[service.Guid] = &service
-	}
-	return services, nil
+	
+	return svcInstanceMap, nil
 }
 
 func (c *Client) BindService(appGuid string, serviceInstanceGuid string) (Credentials, error) {
