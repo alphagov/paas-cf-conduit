@@ -19,31 +19,6 @@ import (
 	gocfclient "github.com/cloudfoundry-community/go-cfclient"
 )
 
-type Metadata struct {
-	Guid      string    `json:"guid"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-type resource struct {
-	Metadata  Metadata        `json:"metadata"`
-	RawEntity json.RawMessage `json:"entity"`
-}
-type page struct {
-	TotalPages   int        `json:"total_pages"`
-	TotalResults int        `json:"total_results"`
-	Resources    []resource `json:"resources"`
-}
-
-type Info struct {
-	DopplerEndpoint   string `json:"doppler_logging_endpoint"`
-	LoggingEndpoint   string `json:"logging_endpoint"`
-	AuthEndpoint      string `json:"authorization_endpoint"`
-	TokenEndpoint     string `json:"token_endpoint"`
-	AppSshEndpoint    string `json:"app_ssh_endpoint"`
-	AppSshHostKey     string `json:"app_ssh_host_key_fingerprint"`
-	AppSshOauthClient string `json:"app_ssh_oauth_client"`
-}
-
 type Env struct {
 	SystemEnv *SystemEnv `json:"system_env_json"`
 }
@@ -57,71 +32,17 @@ type VcapService struct {
 	Credentials credentials
 }
 
-type Org struct {
-	Guid                string    `json:"guid"`
-	UpdatedAt           time.Time `json:"updated_at"`
-	CreatedAt           time.Time `json:"created_at"`
-	Name                string    `json:"name"`
-	QuotaDefinitionGuid string    `json:"quota_definition_guid"`
-	Status              string    `json:"status"`
-}
-
-type Space struct {
-	Guid      string    `json:"guid"`
-	OrgGuid   string    `json:"organization_guid"`
-	UpdatedAt time.Time `json:"updated_at"`
-	CreatedAt time.Time `json:"created_at"`
-	Name      string    `json:"name"`
-}
-
-type ServiceInstance struct {
-	Guid            string    `json:"guid"`
-	UpdatedAt       time.Time `json:"updated_at"`
-	CreatedAt       time.Time `json:"created_at"`
-	Name            string    `json:"name"`
-	Type            string    `json:"type"`
-	ServicePlanGuid string    `json:"service_plan_guid"`
-	SpaceGuid       string    `json:"space_guid"`
-	// Space           *Space            `json:"-"`
-	// Bindings        []*ServiceBinding `json:"-"`
-	// Plan            *ServicePlan      `json:"-"`
-}
-
-func getInfo(api string, insecure bool) (*Info, error) {
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			Proxy:                 http.DefaultTransport.(*http.Transport).Proxy,
-			TLSHandshakeTimeout:   http.DefaultTransport.(*http.Transport).TLSHandshakeTimeout,
-			ExpectContinueTimeout: http.DefaultTransport.(*http.Transport).ExpectContinueTimeout,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: insecure,
-			},
-		},
-	}
-	var info Info
-	resp, err := httpClient.Get(api + "/v2/info")
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	err = json.NewDecoder(resp.Body).Decode(&info)
-	if err != nil {
-		return nil, err
-	}
-	return &info, err
-}
-
 func NewClient(api string, token string, insecure bool) (*Client, error) {
-	info, err := getInfo(api, insecure)
-	if err != nil {
-		return nil, err
-	}
-
 	clientConfig := &gocfclient.Config{
 		ApiAddress: api,
 		Token:      strings.TrimPrefix(token, "bearer "),
 	}
 	cf, _ := gocfclient.NewClient(clientConfig)
+
+	info, err := cf.GetInfo()
+	if err != nil {
+		return nil, err
+	}
 
 	c := &Client{
 		CFClient:           cf,
@@ -140,7 +61,7 @@ type Client struct {
 	ApiEndpoint        string
 	InsecureSkipVerify bool
 	Token              string
-	Info               *Info
+	Info               *gocfclient.Info
 }
 
 func (c *Client) GetNewAccessToken() (string, error) {
@@ -326,6 +247,7 @@ func (c *Client) newCommand(args ...string) (*exec.Cmd, error) {
 }
 
 func (c *Client) SSHCode() (string, error) {
+	// Uses its own http client as the token endpoint is on a different domain
 	errPreventRedirect := errors.New("prevent-redirect")
 	httpClient := &http.Client{
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
@@ -342,7 +264,12 @@ func (c *Client) SSHCode() (string, error) {
 		},
 	}
 
-	authorizeURL, err := url.Parse(c.Info.TokenEndpoint)
+	info, err := c.CFClient.GetInfo()
+	if err != nil {
+		return "", err
+	}
+
+	authorizeURL, err := url.Parse(info.TokenEndpoint)
 	if err != nil {
 		return "", err
 	}
@@ -350,7 +277,7 @@ func (c *Client) SSHCode() (string, error) {
 	values := url.Values{}
 	values.Set("response_type", "code")
 	values.Set("grant_type", "authorization_code")
-	values.Set("client_id", c.Info.AppSshOauthClient)
+	values.Set("client_id", info.AppSSHOauthClient)
 
 	authorizeURL.Path = "/oauth/authorize"
 	authorizeURL.RawQuery = values.Encode()
@@ -360,7 +287,12 @@ func (c *Client) SSHCode() (string, error) {
 		return "", err
 	}
 
-	authorizeReq.Header.Add("authorization", c.Token)
+	token, err := c.CFClient.GetToken()
+	if err != nil {
+		return "", err
+	}
+
+	authorizeReq.Header.Add("authorization", token)
 
 	resp, err := httpClient.Do(authorizeReq)
 	if err == nil {

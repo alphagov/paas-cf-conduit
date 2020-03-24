@@ -317,8 +317,8 @@ func (a *App) SetupTunnels() error {
 func (a *App) startSSHTunnels() error {
 	a.tunnel = &ssh.Tunnel{
 		AppGuid:       a.appGUID,
-		TunnelAddr:    a.cfClient.Info.AppSshEndpoint,
-		TunnelHostKey: a.cfClient.Info.AppSshHostKey,
+		TunnelAddr:    a.cfClient.Info.AppSSHEndpoint,
+		TunnelHostKey: a.cfClient.Info.AppSSHHostKeyFingerprint,
 		ForwardAddrs:  a.forwardAddrs,
 		PasswordFunc:  a.cfClient.SSHCode,
 	}
