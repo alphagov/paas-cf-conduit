@@ -5,19 +5,16 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"encoding/gob"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -284,55 +281,13 @@ func (c *Client) BindService(appGuid string, serviceInstanceGuid string) (Creden
 
 func (c *Client) UploadStaticAppBits(appGuid string) error {
 	buf := new(bytes.Buffer)
-	zipFile := zip.NewWriter(buf)
-	_, err := zipFile.Create("Staticfile")
+	zipWriter := zip.NewWriter(buf)
+	err := createZeroByteFileInZip(zipWriter, "Staticfile")
 	if err != nil {
 		return err
 	}
 
-	return c.UploadAppBits(appGuid, buf)
-}
-
-func (c *Client) UploadAppBits(appGuid string, bits io.Reader) error {
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	err := writer.WriteField("resources", `[{"fn":"Staticfile","size":0,"sha1":"da39a3ee5e6b4b0d3255bfef95601890afd80709","mode":"644"}]`)
-	if err != nil {
-		return err
-	}
-	err = writer.WriteField("async", "true")
-	if err != nil {
-		return err
-	}
-	part, err := writer.CreateFormFile("application", "application.zip")
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(part, bits)
-	if err != nil {
-		return err
-	}
-	time.Sleep(5 * time.Second)
-	uri := "/v2/apps/" + appGuid + "/bits"
-	req, err := c.NewRequest("PUT", uri, body)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Connection", "close")
-	req.Header.Set("User-Agent", "go-cli 6.28.0 / "+runtime.GOOS)
-	req.ContentLength = int64(body.Len())
-	res, err := c.Do(req)
-	if err != nil {
-		return err
-	}
-	if res.StatusCode != 200 && res.StatusCode != 201 {
-		resBody, _ := ioutil.ReadAll(res.Body)
-		return fmt.Errorf("%s %s: request to send %d bytes failed with status %d: %s", req.Method, uri, req.ContentLength, res.StatusCode, string(resBody))
-	}
-	return nil
-
+	return c.CFClient.UploadAppBits(buf, appGuid)
 }
 
 func (c *Client) DestroyApp(appGuid string) error {
@@ -642,13 +597,19 @@ func (c *Client) SSHCode() (string, error) {
 	return codes[0], nil
 }
 
-func getBytes(key interface{}) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(key)
+func createZeroByteFileInZip(zipWriter *zip.Writer, name string) error {
+	fileInZip, err := zipWriter.Create(name)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return buf.Bytes(), nil
+	_, err = fileInZip.Write([]byte{})
+	if err != nil {
+		return err
+	}
 
+	err = zipWriter.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }
