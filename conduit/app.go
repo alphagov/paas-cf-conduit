@@ -13,6 +13,8 @@ import (
 	"github.com/alphagov/paas-cf-conduit/tls"
 	"github.com/alphagov/paas-cf-conduit/util"
 	"github.com/cloudfoundry/multierror"
+
+	gocfclient "github.com/cloudfoundry-community/go-cfclient"
 )
 
 type App struct {
@@ -26,8 +28,8 @@ type App struct {
 	serviceInstanceNames []string
 	runArgs              []string
 	program              string
-	org                  *client.Org
-	space                *client.Space
+	org                  *gocfclient.Org
+	space                *gocfclient.Space
 	appGUID              string
 	appEnv               *client.Env
 	serviceProviders     map[string]ServiceProvider
@@ -133,7 +135,7 @@ func (a *App) deployApp() error {
 	}
 	// start app
 	a.status.Text("Starting", a.appName)
-	if err := a.cfClient.UpdateApp(a.appGUID, map[string]interface{}{"state": "STARTED"}); err != nil {
+	if err := a.cfClient.StartApp(a.appGUID); err != nil {
 		return err
 	}
 
@@ -315,8 +317,8 @@ func (a *App) SetupTunnels() error {
 func (a *App) startSSHTunnels() error {
 	a.tunnel = &ssh.Tunnel{
 		AppGuid:       a.appGUID,
-		TunnelAddr:    a.cfClient.Info.AppSshEndpoint,
-		TunnelHostKey: a.cfClient.Info.AppSshHostKey,
+		TunnelAddr:    a.cfClient.Info.AppSSHEndpoint,
+		TunnelHostKey: a.cfClient.Info.AppSSHHostKeyFingerprint,
 		ForwardAddrs:  a.forwardAddrs,
 		PasswordFunc:  a.cfClient.SSHCode,
 	}
