@@ -12,8 +12,8 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/mattn/go-colorable v0.0.9 // indirect
 	github.com/mattn/go-isatty v0.0.3 // indirect
-	github.com/onsi/ginkgo v1.6.0
-	github.com/onsi/gomega v1.4.3
+	github.com/onsi/ginkgo v1.12.0
+	github.com/onsi/gomega v1.7.1
 	github.com/spf13/cobra v0.0.1
 	github.com/spf13/pflag v1.0.0 // indirect
 	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
