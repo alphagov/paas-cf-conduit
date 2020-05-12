@@ -51,15 +51,16 @@ func (p *Plugin) Run(conn plugin.CliConnection, args []string) {
 	}
 	// parse
 	p.cmd.SetArgs(args)
+	exitCode := 1
 	if err := p.cmd.Execute(); err != nil {
-		fmt.Println(err)
-
 		if exitError, ok := err.(conduit.AppExecution); ok {
-			os.Exit(exitError.ExitCode)
-		} else {
-			os.Exit(1)
+			exitCode = exitError.ExitCode
 		}
+
+		fmt.Println(err)
+		os.Exit(exitCode)
 	}
+
 	os.Exit(0)
 }
 

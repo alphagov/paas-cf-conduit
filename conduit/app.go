@@ -411,7 +411,11 @@ func (a *App) RunCommand() error {
 	proc.Wait()
 
 	if proc.ProcessState != nil {
-		return &AppExecution{ExitCode: proc.ProcessState.ExitCode()}
+		exitCode := proc.ProcessState.ExitCode()
+
+		if exitCode != 0 {
+			return AppExecution{ExitCode: exitCode}
+		}
 	}
 
 	return nil
