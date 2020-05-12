@@ -103,20 +103,15 @@ var ConnectService = &cobra.Command{
 			app.PrintConnectionInfo()
 		}
 
-		finish := make(chan struct{})
 		if len(runargs) > 0 {
-			if err := app.RunCommand(finish); err != nil {
-				return err
-			}
-		} else {
-			fmt.Fprintln(os.Stderr, "\nPress Ctrl+C to shutdown.")
+			return app.RunCommand()
 		}
+
+		fmt.Fprintln(os.Stderr, "\nPress Ctrl+C to shutdown.")
 
 		// wait
 		select {
 		case <-shutdown:
-			return nil
-		case <-finish:
 			return nil
 		}
 	},
