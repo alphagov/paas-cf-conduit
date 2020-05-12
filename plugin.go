@@ -7,6 +7,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"code.cloudfoundry.org/cli/plugin"
+
+	"github.com/alphagov/paas-cf-conduit/conduit"
 )
 
 type Plugin struct {
@@ -51,7 +53,12 @@ func (p *Plugin) Run(conn plugin.CliConnection, args []string) {
 	p.cmd.SetArgs(args)
 	if err := p.cmd.Execute(); err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+
+		if exitError, ok := err.(conduit.AppExecution); ok {
+			os.Exit(exitError.ExitCode)
+		} else {
+			os.Exit(1)
+		}
 	}
 	os.Exit(0)
 }

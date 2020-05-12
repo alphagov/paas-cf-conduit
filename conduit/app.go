@@ -17,6 +17,14 @@ import (
 	gocfclient "github.com/cloudfoundry-community/go-cfclient"
 )
 
+type AppExecution struct {
+	ExitCode int
+}
+
+func (ae AppExecution) Error() string {
+	return fmt.Sprintf("Exit with code %d", ae.ExitCode)
+}
+
 type App struct {
 	cfClient             *client.Client
 	status               *util.Status
@@ -370,7 +378,7 @@ func (a *App) startTLSTunnels() error {
 	return nil
 }
 
-func (a *App) RunCommand(finish chan struct{}) error {
+func (a *App) RunCommand() error {
 	// execute CMD with environment
 	a.status.Text("Preparing command:", strings.Join(a.runArgs, " "))
 
@@ -399,10 +407,12 @@ func (a *App) RunCommand(finish chan struct{}) error {
 	if err := proc.Start(); err != nil {
 		return fmt.Errorf("%s: %s", exe, err)
 	}
-	go func() {
-		defer close(finish)
-		proc.Wait()
-	}()
+
+	proc.Wait()
+
+	if proc.ProcessState != nil {
+		return &AppExecution{ExitCode: proc.ProcessState.ExitCode()}
+	}
 
 	return nil
 }
