@@ -69,6 +69,10 @@ var ConnectService = &cobra.Command{
 			return err
 		}
 
+		if util.PortIsInUse(int(ConduitLocalPort)) {
+			return fmt.Errorf("Port %d is already in use", ConduitLocalPort)
+		}
+
 		app := conduit.NewApp(
 			cfClient, status,
 			ConduitLocalPort, ConduitOrg, ConduitSpace, ConduitAppName, !ConduitReuse,

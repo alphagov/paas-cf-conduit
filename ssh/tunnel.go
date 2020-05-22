@@ -185,8 +185,8 @@ func (t *Tunnel) startKeepalive(user string, sshConnection *ssh.Client) {
 	defer ticker.Stop()
 	for {
 		<-ticker.C
-		if _, _, err := sshConnection.SendRequest(keepaliveName, true, nil); err != nil {
-			logging.Debug("failed to send keepalive message", user, t.TunnelAddr)
+		if _, _, err := sshConnection.SendRequest(keepaliveName, true, make([]byte, 0)); err != nil {
+			logging.Debug("failed to send keepalive message", user, t.TunnelAddr, err)
 			return
 		}
 	}
