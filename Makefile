@@ -21,6 +21,10 @@ dist:
 	$(eval export ALL_GOOS)
 	./dist.sh
 
+.PHONY: generate-release-yaml
+generate-release-yaml:
+	./release-yaml.sh
+
 .PHONY: clean
 clean:
 	rm -rf bin
