@@ -23,9 +23,27 @@ for v in "${versions[@]}"; do
   url="https://github.com/alphagov/paas-cf-conduit/releases/download/${latest_tag}/${v}"
   checksum="$(curl -sfL "${url}.sha1")"
 
+  case $v in
+  cf-conduit.darwin*)
+    platform="osx"
+    ;;
+  cf-conduit.windows.386)
+    platform="win32"
+    ;;
+  cf-conduit.windows.amd64)
+    platform="win64"
+    ;;
+  cf-conduit.linux.386)
+    platform="linux32"
+    ;;
+  cf-conduit.linux.amd64)
+    platform="linux64"
+    ;;
+  esac
+
 cat <<EOF
 - checksum: ${checksum}
-  platform: $(grep -o 'windows\|darwin\|linux' <<< "$v")
+  platform: ${platform}
   url: ${url}
 EOF
 
