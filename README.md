@@ -160,3 +160,20 @@ bash$
 ```
 
 [logo]: logo.jpg
+
+## Development
+
+
+To run the tests, run `make test`
+
+
+To release a new version:
+
+1. Checkout latest master
+1. Generate artefacts: `make dist`
+1. Create a new tag: `git tag v0.0.xyz`
+1. Push the new tag: `git push --tag`
+1. Create a new release via the GitHub UI with release artefacts from `bin`
+1. Raise a pull request via the
+   [release repo](https://github.com/alphagov/paas-cf-cli-plugin-repo)
+   using `make generate-release-yaml`
