@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -73,10 +74,15 @@ var ConnectService = &cobra.Command{
 			return fmt.Errorf("Port %d is already in use", ConduitLocalPort)
 		}
 
+		var bindParams map[string]interface{}
+		if err = json.Unmarshal([]byte(RawBindParameters), &bindParams); err != nil {
+			return fmt.Errorf("Could not parse bind parameters as JSON: %s", err)
+		}
+
 		app := conduit.NewApp(
 			cfClient, status,
 			ConduitLocalPort, ConduitOrg, ConduitSpace, ConduitAppName, !ConduitReuse,
-			serviceInstanceNames, runargs,
+			serviceInstanceNames, runargs, bindParams,
 		)
 
 		app.RegisterServiceProvider("mysql", &service.MySQL{})

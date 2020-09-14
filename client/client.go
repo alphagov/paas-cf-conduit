@@ -125,7 +125,11 @@ func (c *Client) GetServiceInstances(filters ...string) (map[string]*gocfclient.
 	return svcInstanceMap, nil
 }
 
-func (c *Client) BindService(appGuid string, serviceInstanceGuid string) (Credentials, error) {
+func (c *Client) BindService(
+	appGuid string,
+	serviceInstanceGuid string,
+	parameters map[string]interface{},
+) (Credentials, error) {
 	res := struct {
 		Entity struct {
 			Credentials credentials `json:"credentials"`
@@ -135,6 +139,7 @@ func (c *Client) BindService(appGuid string, serviceInstanceGuid string) (Creden
 	body := map[string]interface{}{
 		"app_guid":              appGuid,
 		"service_instance_guid": serviceInstanceGuid,
+		"parameters":            parameters,
 	}
 	bodyJson, err := json.Marshal(body)
 	if err != nil {

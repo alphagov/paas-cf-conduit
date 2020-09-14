@@ -17,16 +17,17 @@ import (
 )
 
 var (
-	NonInteractive   bool
-	ConduitReuse     bool
-	ConduitAppName   string
-	ConduitOrg       string
-	ConduitSpace     string
-	ConduitLocalPort int64
-	ApiEndpoint      string
-	ApiToken         string
-	ApiInsecure      bool
-	shutdown         chan struct{}
+	NonInteractive    bool
+	ConduitReuse      bool
+	ConduitAppName    string
+	ConduitOrg        string
+	ConduitSpace      string
+	ConduitLocalPort  int64
+	ApiEndpoint       string
+	ApiToken          string
+	ApiInsecure       bool
+	RawBindParameters string
+	shutdown          chan struct{}
 )
 
 func init() {
@@ -79,6 +80,7 @@ func main() {
 	cmd.PersistentFlags().MarkHidden("token")
 	cmd.PersistentFlags().BoolVar(&ApiInsecure, "insecure", false, "allow insecure API endpoint")
 	cmd.PersistentFlags().MarkHidden("insecure")
+	cmd.PersistentFlags().StringVarP(&RawBindParameters, "bind-parameters", "c", "{}", "bind parameters in JSON format")
 	cmd.AddCommand(ConnectService)
 	cmd.AddCommand(Uninstall)
 	plugin.Start(&Plugin{cmd})

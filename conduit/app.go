@@ -32,6 +32,7 @@ type App struct {
 	orgName              string
 	spaceName            string
 	appName              string
+	bindParameters       map[string]interface{}
 	deleteApp            bool
 	serviceInstanceNames []string
 	runArgs              []string
@@ -65,6 +66,7 @@ func NewApp(
 	deleteApp bool,
 	serviceInstanceNames []string,
 	runArgs []string,
+	bindParameters map[string]interface{},
 ) *App {
 	var program string
 	if len(runArgs) > 0 {
@@ -84,6 +86,7 @@ func NewApp(
 		serviceProviders:     make(map[string]ServiceProvider),
 		runEnv:               make(map[string]string),
 		forwardAddrs:         make([]ssh.ForwardAddrs, 0),
+		bindParameters:       bindParameters,
 	}
 }
 
@@ -203,7 +206,7 @@ func (a *App) bindServices() error {
 			// bind conduit app to service instance
 			a.status.Text("Binding", serviceInstance.Name)
 			logging.Debug("binding", serviceInstanceGUID, "to", a.appGUID)
-			creds, err := a.cfClient.BindService(a.appGUID, serviceInstanceGUID)
+			creds, err := a.cfClient.BindService(a.appGUID, serviceInstanceGUID, a.bindParameters)
 			if err != nil {
 				return err
 			}
