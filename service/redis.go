@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/alphagov/paas-cf-conduit/client"
@@ -27,4 +28,16 @@ func (r *Redis) GetNonTLSClients() []string {
 
 func (r *Redis) GetKnownClients() []string {
 	return []string{"redis-cli"}
+}
+
+func (r *Redis) AdditionalProgramArgs(serviceInstances []*client.VcapService) []string {
+	if len(serviceInstances) == 0 {
+		return []string{}
+	}
+
+	return []string{
+		"-h", serviceInstances[0].Credentials.Host(),
+		"-p", fmt.Sprintf("%d", serviceInstances[0].Credentials.Port()),
+		"-a", serviceInstances[0].Credentials.Password(),
+	}
 }

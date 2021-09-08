@@ -88,6 +88,7 @@ var ConnectService = &cobra.Command{
 		app.RegisterServiceProvider("mysql", &service.MySQL{})
 		app.RegisterServiceProvider("postgres", &service.Postgres{})
 		app.RegisterServiceProvider("redis", &service.Redis{})
+		app.RegisterServiceProvider("influxdb", &service.InfluxDB{})
 
 		defer func() {
 			if err := app.Teardown(); err != nil {
