@@ -66,3 +66,7 @@ func (m *MySQL) GetNonTLSClients() []string {
 func (m *MySQL) GetKnownClients() []string {
 	return []string{"mysql", "mysqldump"}
 }
+
+func (m *MySQL) AdditionalProgramArgs(serviceInstances []*client.VcapService) []string {
+	return []string{}
+}

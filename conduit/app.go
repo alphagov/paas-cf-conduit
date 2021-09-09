@@ -54,6 +54,7 @@ type ServiceProvider interface {
 	GetKnownClients() []string
 	InitEnv(creds client.Credentials, env map[string]string) error
 	Teardown() error
+	AdditionalProgramArgs(serviceInstances []*client.VcapService) []string
 }
 
 func NewApp(
@@ -265,6 +266,7 @@ func (a *App) initServiceBindings() error {
 					RemoteAddr: fmt.Sprintf("%s:%d", si.Credentials.Host(), si.Credentials.Port()),
 					LocalPort:  a.nextPort,
 				}
+				logging.Debug("remote address for tunnel will be %s", forwardAddr.RemoteAddr)
 				a.nextPort++
 
 				createTLSTunnel := false
@@ -425,19 +427,12 @@ func (a *App) RunCommand() error {
 }
 
 func (a *App) getProgramSpecificArgs(program string) []string {
-	switch program {
-	case "redis-cli":
-		serviceInstances, ok := a.appEnv.SystemEnv.VcapServices["redis"]
-		if !ok {
-			return nil
-		}
-		if len(serviceInstances) == 0 {
-			return nil
-		}
-		return []string{
-			"-h", serviceInstances[0].Credentials.Host(),
-			"-p", fmt.Sprintf("%d", serviceInstances[0].Credentials.Port()),
-			"-a", serviceInstances[0].Credentials.Password(),
+	for serviceName, provider := range a.serviceProviders {
+		for _, knownProgram := range provider.GetKnownClients() {
+			if knownProgram == program {
+				serviceInstances := a.appEnv.SystemEnv.VcapServices[serviceName]
+				return provider.AdditionalProgramArgs(serviceInstances)
+			}
 		}
 	}
 	return nil

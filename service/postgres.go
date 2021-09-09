@@ -41,3 +41,7 @@ func (p *Postgres) GetNonTLSClients() []string {
 func (p *Postgres) GetKnownClients() []string {
 	return []string{"psql", "pg_dump"}
 }
+
+func (p *Postgres) AdditionalProgramArgs(serviceInstances []*client.VcapService) []string {
+	return []string{}
+}
