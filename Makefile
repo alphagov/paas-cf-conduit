@@ -1,7 +1,7 @@
 
 NAME = cf-conduit
 GOBUILD = go build
-ALL_GOARCH = amd64 386
+ALL_GOARCH = amd64 arm64 386
 ALL_GOOS = windows linux darwin
 
 .PHONY: build

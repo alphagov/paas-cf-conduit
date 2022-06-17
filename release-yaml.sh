@@ -13,10 +13,13 @@ echo "binaries:"
 
 versions=(
 cf-conduit.darwin.amd64
+cf-conduit.darwin.arm64
 cf-conduit.windows.386
 cf-conduit.windows.amd64
+cf-conduit.windows.arm64
 cf-conduit.linux.386
 cf-conduit.linux.amd64
+cf-conduit.linux.arm64
 )
 
 for v in "${versions[@]}"; do
