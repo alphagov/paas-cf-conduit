@@ -5,7 +5,7 @@ set -ueo pipefail
 root_d="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
 bin_d="${root_d}/bin"
 
-latest_tag="$(git tag -l | sort -V | tail -r | head -n 1)"
+latest_tag="$(git tag -l | sort -V | tail -1)"
 
 echo "Latest tag is ${latest_tag}"
 echo "---"
@@ -36,12 +36,18 @@ for v in "${versions[@]}"; do
   cf-conduit.windows.amd64)
     platform="win64"
     ;;
+  cf-conduit.windows.arm64)
+      platform="win64"
+      ;;
   cf-conduit.linux.386)
     platform="linux32"
     ;;
   cf-conduit.linux.amd64)
     platform="linux64"
     ;;
+  cf-conduit.linux.arm64)
+      platform="linux64"
+      ;;
   esac
 
 cat <<EOF
