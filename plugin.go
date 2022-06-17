@@ -70,7 +70,7 @@ func (p *Plugin) GetMetadata() plugin.PluginMetadata {
 		Version: plugin.VersionType{
 			Major: 0,
 			Minor: 0,
-			Build: 12,
+			Build: 14,
 		},
 		MinCliVersion: plugin.VersionType{
 			Major: 6,
