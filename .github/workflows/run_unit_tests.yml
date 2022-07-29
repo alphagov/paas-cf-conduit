@@ -1,7 +1,7 @@
 name: Run tests
 on: [push, pull_request]
 env:
-  GO_VERSION: 1.13
+  GO_VERSION: 1.18
 jobs:
 
   build:
@@ -18,7 +18,7 @@ jobs:
 
       - name: Install Ginkgo CLI
         run: |
-          go get -u github.com/onsi/ginkgo/ginkgo
+          go install github.com/onsi/ginkgo/v2/ginkgo@latest
 
       - name: Run tests
         run: |
