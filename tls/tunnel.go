@@ -5,22 +5,34 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"runtime"
+	"strings"
 
 	"github.com/alphagov/paas-cf-conduit/logging"
+	"github.com/alphagov/paas-cf-conduit/util"
 )
 
 type Tunnel struct {
-	localAddr  string
-	remoteAddr string
-	listener   net.Listener
-	errorChan  chan error
+	localAddr      string
+	remoteAddr     string
+	actualAddr     string
+	listener       net.Listener
+	errorChan      chan error
+	tlsCipherSuite []uint16
+	tlsMinVersion  uint16
+	insecure       bool
 }
 
-func NewTunnel(localAddr, remoteAddr string) *Tunnel {
+func NewTunnel(localAddr, remoteAddr, actualAddr string, insecure bool, tlsCipherSuite []uint16, tlsMinVersion uint16) *Tunnel {
 	return &Tunnel{
-		localAddr:  localAddr,
-		remoteAddr: remoteAddr,
-		errorChan:  make(chan error, 8),
+		localAddr:      localAddr,
+		remoteAddr:     remoteAddr,
+		actualAddr:     actualAddr,
+		errorChan:      make(chan error, 8),
+		tlsCipherSuite: tlsCipherSuite,
+		tlsMinVersion:  tlsMinVersion,
+		insecure:       insecure,
 	}
 }
 
@@ -57,10 +69,34 @@ func (t *Tunnel) run() {
 }
 
 func (t *Tunnel) handleRequest(conn net.Conn) error {
-	tlsConfig := tls.Config{
-		InsecureSkipVerify: true,
+	var tlsConfig *tls.Config
+
+	// This horrible hack is to work around an certificate validation issue on OXS
+	// See the comment in util.GetRootCAs for more details
+	// Hopefully this can be removed once we have a better solution
+
+	_, err := os.Stat("/etc/ssl/cert.pem")
+	if runtime.GOOS == "darwin" && err == nil && !t.insecure {
+		rootCAs, err := util.GetRootCAs(nil)
+		if err != nil {
+			return err
+		}
+		tlsConfig = &tls.Config{
+			ServerName:   strings.Split(t.actualAddr, ":")[0],
+			RootCAs:      rootCAs,
+			CipherSuites: t.tlsCipherSuite,
+			MinVersion:   t.tlsMinVersion,
+		}
+	} else {
+		tlsConfig = &tls.Config{
+			ServerName:         strings.Split(t.actualAddr, ":")[0],
+			InsecureSkipVerify: t.insecure,
+			CipherSuites:       t.tlsCipherSuite,
+			MinVersion:         t.tlsMinVersion,
+		}
 	}
-	rconn, err := tls.Dial("tcp", t.remoteAddr, &tlsConfig)
+
+	rconn, err := tls.Dial("tcp", t.remoteAddr, tlsConfig)
 	if err != nil {
 		return fmt.Errorf("failed to connect to %s: %s", t.remoteAddr, "err")
 	}

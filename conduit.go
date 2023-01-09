@@ -63,9 +63,19 @@ var ConnectService = &cobra.Command{
 		status := util.NewStatus(os.Stderr, NonInteractive)
 		defer status.Done()
 
+		tlsCipherSuites, err := util.CipherSuiteNamesToIDs(CipherSuites)
+		if err != nil {
+			return err
+		}
+
+		versionID, err := util.TLSVersionToID(MinTLSVersion)
+		if err != nil {
+			return err
+		}
+
 		// create a client
 		status.Text("Connecting client")
-		cfClient, err := client.NewClient(ApiEndpoint, ApiToken, ApiInsecure)
+		cfClient, err := client.NewClient(ApiEndpoint, ApiToken, ApiInsecure, tlsCipherSuites, versionID)
 		if err != nil {
 			return err
 		}
@@ -82,7 +92,7 @@ var ConnectService = &cobra.Command{
 		app := conduit.NewApp(
 			cfClient, status,
 			ConduitLocalPort, ConduitOrg, ConduitSpace, ConduitAppName, !ConduitReuse,
-			serviceInstanceNames, runargs, bindParams,
+			serviceInstanceNames, runargs, bindParams, ApiInsecure, tlsCipherSuites, versionID,
 		)
 
 		app.RegisterServiceProvider("mysql", &service.MySQL{})
