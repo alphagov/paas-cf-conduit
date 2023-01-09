@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 
 	"github.com/alphagov/paas-cf-conduit/client"
@@ -130,12 +131,58 @@ func (a *App) DeployApp() error {
 		return err
 	}
 
-	if err := a.checkForMatchingService(); err != nil {
+	return nil
+}
+
+func (a *App) PrepareForExistingApp() error {
+	a.status.Text("Fetching information about app", a.appName)
+	app, err := a.cfClient.GetAppByName(a.org.Guid, a.space.Guid, a.appName)
+	if err != nil {
 		return err
 	}
 
-	if err := a.initServiceBindings(); err != nil {
+	a.appGUID = app.Guid
+
+	// check it's actually bound to the requested services
+	a.status.Text("Fetching service infomation")
+	serviceInstances, err := a.cfClient.GetServiceInstances(
+		fmt.Sprintf("space_guid:%s", a.space.Guid),
+	)
+	if err != nil {
 		return err
+	}
+
+	a.status.Text("Fetching binding infomation")
+	serviceBindings, err := a.cfClient.GetServiceBindings(
+		fmt.Sprintf("app_guid:%s", a.appGUID),
+	)
+	if err != nil {
+		return err
+	}
+
+	for _, serviceInstanceName := range a.serviceInstanceNames {
+		serviceInstanceGUID := ""
+		for siGUID, serviceInstance := range serviceInstances {
+			if serviceInstance.Name == serviceInstanceName {
+				serviceInstanceGUID = siGUID
+				break
+			}
+		}
+		if serviceInstanceGUID == "" {
+			return fmt.Errorf(
+				"Service '%s' was not found in space '%s'\n",
+				serviceInstanceName,
+				a.space.Name,
+			)
+		}
+
+		if _, ok := serviceBindings[serviceInstanceGUID]; !ok {
+			return fmt.Errorf(
+				"App '%s' doesn't appear to be bound to service '%s'. Using an existing app requires the app to have an existing binding to the desired service(s).\n",
+				a.appName,
+				serviceInstanceName,
+			)
+		}
 	}
 
 	return nil
@@ -229,53 +276,75 @@ func (a *App) bindServices() error {
 			return fmt.Errorf("failed to bind service: '%s' was not found in space '%s'", name, a.space.Name)
 		}
 	}
-
-	// fetch the full app env
-	a.status.Text("Fetching environment")
-	a.appEnv, err = a.cfClient.GetAppEnv(a.appGUID)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
-func (a *App) checkForMatchingService() error {
-	if a.program == "" {
-		return nil
-	}
-
+func (a *App) getAllValidServiceTypesForProgram(program string) []string {
 	validServiceTypes := []string{}
 	for serviceType, serviceProvider := range a.serviceProviders {
 		for _, knownClient := range serviceProvider.GetKnownClients() {
-			if knownClient == a.program {
+			if knownClient == program {
 				validServiceTypes = append(validServiceTypes, serviceType)
-				if len(a.appEnv.SystemEnv.VcapServices[serviceType]) > 0 {
-					return nil
-				}
-				break
 			}
 		}
 	}
-
-	if len(validServiceTypes) == 0 {
-		return nil
-	}
-
-	return fmt.Errorf(
-		"%s program expects one of the following service types: %s", a.program, strings.Join(validServiceTypes, ", "),
-	)
+	return validServiceTypes
 }
 
+// responsible for populating:
+// - a.appEnv with a `.SystemEnv.VcapServices` that is pruned of irrelevant
+//   binding credentials and has relevant binding credentials modified to
+//   target the local tunnel
+// - a.runEnv["VCAP_SERVICES"] with a jsonified version of the above
+// - a.forwardAddrs with the details of the planned tunnels
 func (a *App) initServiceBindings() error {
-	for serviceName, serviceInstances := range a.appEnv.SystemEnv.VcapServices {
-		for _, si := range serviceInstances {
-			if serviceProvider, ok := a.serviceProviders[serviceName]; ok {
+	// fetch the full app env
+	a.status.Text("Fetching environment")
+	if appEnv, err := a.cfClient.GetAppEnv(a.appGUID); err == nil {
+		a.appEnv = appEnv
+	} else {
+		return err
+	}
+
+	// if only for the sake of easier testing, choose a deterministic
+	// order to iterate through VcapServices as it affects e.g. port
+	// number selection
+	orderedVcapServicesKeys := []string{}
+	for k, _ := range a.appEnv.SystemEnv.VcapServices {
+		orderedVcapServicesKeys = append(orderedVcapServicesKeys, k)
+	}
+	sort.Strings(orderedVcapServicesKeys)
+
+	unsatisfiedServiceInstanceNames := map[string]bool{}
+	for _, name := range a.serviceInstanceNames {
+		unsatisfiedServiceInstanceNames[name] = true
+	}
+	programServiceTypeSatisfied := false
+	for _, serviceName := range orderedVcapServicesKeys {
+		keptServiceInstances := []*client.VcapService{}
+		for _, si := range a.appEnv.SystemEnv.VcapServices[serviceName] {
+			if _, ok := unsatisfiedServiceInstanceNames[si.InstanceName]; !ok {
+				continue
+			}
+			// now satisfied
+			delete(unsatisfiedServiceInstanceNames, si.InstanceName)
+
+			if serviceProvider, ok := a.serviceProviders[serviceName]; !ok {
+				return fmt.Errorf(
+					"App %s: service instance %s is of unknown type %s, don't know how to handle its credentials",
+					a.appName,
+					si.InstanceName,
+					serviceName,
+				)
+			} else {
+				// this one is relevant to our interests
+				keptServiceInstances = append(keptServiceInstances, si)
+
 				forwardAddr := ssh.ForwardAddrs{
 					RemoteAddr: fmt.Sprintf("%s:%d", si.Credentials.Host(), si.Credentials.Port()),
 					LocalPort:  a.nextPort,
 				}
-				logging.Debug("remote address for tunnel will be %s", forwardAddr.RemoteAddr)
+				logging.Debug("remote address for tunnel will be", forwardAddr.RemoteAddr)
 				a.nextPort++
 
 				createTLSTunnel := false
@@ -295,9 +364,52 @@ func (a *App) initServiceBindings() error {
 
 				si.Credentials.SetAddress("127.0.0.1", forwardAddr.ConnectPort())
 
-				serviceProvider.InitEnv(si.Credentials, a.runEnv)
+				if !programServiceTypeSatisfied {
+					for _, knownClient := range serviceProvider.GetKnownClients() {
+						if knownClient == a.program {
+							serviceProvider.InitEnv(si.Credentials, a.runEnv)
+							programServiceTypeSatisfied = true
+							break
+						}
+					}
+				}
 			}
 		}
+
+		// discard service instances we didn't match
+		if len(keptServiceInstances) == 0 {
+			// drop map entry entirely if none kept
+			delete(a.appEnv.SystemEnv.VcapServices, serviceName)
+		} else {
+			a.appEnv.SystemEnv.VcapServices[serviceName] = keptServiceInstances
+		}
+	}
+	if len(unsatisfiedServiceInstanceNames) != 0 {
+		names := []string{}
+		for k, _ := range unsatisfiedServiceInstanceNames {
+			names = append(names, k)
+		}
+
+		return fmt.Errorf(
+			"App %s: can't find binding information for services: %s",
+			a.appName,
+			strings.Join(names, ", "),
+		)
+	}
+	if a.program != "" && !programServiceTypeSatisfied {
+		validServiceTypes := a.getAllValidServiceTypesForProgram(a.program)
+		if len(validServiceTypes) == 0 {
+			return fmt.Errorf(
+				"Unknown program %s: can't determine what service types it expects",
+				a.program,
+ 			) 
+		}
+
+		return fmt.Errorf(
+			"%s program expects one of the following service types: %s",
+			a.program,
+			strings.Join(validServiceTypes, ", "),
+		)
 	}
 
 	logging.Debug("runenv", a.runEnv)
@@ -325,6 +437,10 @@ func (a *App) PrintConnectionInfo() {
 }
 
 func (a *App) SetupTunnels() error {
+	if err := a.initServiceBindings(); err != nil {
+		return err
+	}
+
 	if err := a.startSSHTunnels(); err != nil {
 		return err
 	}

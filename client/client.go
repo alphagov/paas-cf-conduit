@@ -28,8 +28,9 @@ type SystemEnv struct {
 }
 
 type VcapService struct {
-	Name        string
-	Credentials credentials
+	Name         string
+	Credentials  credentials
+	InstanceName string `json:"instance_name"`
 }
 
 func NewClient(api string, token string, insecure bool, cipherSuites []uint16, minTLSVersion uint16) (*Client, error) {
@@ -125,6 +126,33 @@ func (c *Client) GetOrgByName(name string) (*gocfclient.Org, error) {
 		return nil, err
 	}
 	return &org, nil
+}
+
+func (c *Client) GetAppByName(orgGuid, spaceGuid, appName string) (*gocfclient.App, error) {
+	app, err := c.CFClient.AppByName(appName, spaceGuid, orgGuid)
+
+	if err != nil {
+		return nil, err
+	}
+	return &app, nil
+}
+
+func (c *Client) GetServiceBindings(filters ...string) (map[string]*gocfclient.ServiceBinding, error) {
+	svcBindingMap := map[string]*gocfclient.ServiceBinding{}
+
+	bindings, err := c.CFClient.ListServiceBindingsByQuery(url.Values{
+		"q": filters,
+	})
+
+	if err != nil {
+		return svcBindingMap, err
+	}
+
+	for i, binding := range bindings {
+		svcBindingMap[binding.ServiceInstanceGuid] = &bindings[i]
+	}
+
+	return svcBindingMap, nil
 }
 
 func (c *Client) GetServiceInstances(filters ...string) (map[string]*gocfclient.ServiceInstance, error) {
