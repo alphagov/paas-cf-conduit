@@ -32,4 +32,4 @@ clean:
 .PHONY: test
 test:
 	go vet
-	ginkgo -r
+	go run github.com/onsi/ginkgo/v2/ginkgo -r

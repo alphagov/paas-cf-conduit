@@ -22,9 +22,15 @@ github.com/cloudfoundry/multierror
 # github.com/fatih/color v1.5.0
 ## explicit
 github.com/fatih/color
+# github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0
+## explicit; go 1.13
+github.com/go-task/slim-sprig
 # github.com/golang/protobuf v1.5.2
 ## explicit; go 1.9
 github.com/golang/protobuf/proto
+# github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38
+## explicit; go 1.14
+github.com/google/pprof/profile
 # github.com/inconshreveable/mousetrap v1.0.0
 ## explicit
 github.com/inconshreveable/mousetrap
@@ -39,6 +45,16 @@ github.com/mattn/go-isatty
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
 github.com/onsi/ginkgo/v2/formatter
+github.com/onsi/ginkgo/v2/ginkgo
+github.com/onsi/ginkgo/v2/ginkgo/build
+github.com/onsi/ginkgo/v2/ginkgo/command
+github.com/onsi/ginkgo/v2/ginkgo/generators
+github.com/onsi/ginkgo/v2/ginkgo/internal
+github.com/onsi/ginkgo/v2/ginkgo/labels
+github.com/onsi/ginkgo/v2/ginkgo/outline
+github.com/onsi/ginkgo/v2/ginkgo/run
+github.com/onsi/ginkgo/v2/ginkgo/unfocus
+github.com/onsi/ginkgo/v2/ginkgo/watch
 github.com/onsi/ginkgo/v2/internal
 github.com/onsi/ginkgo/v2/internal/global
 github.com/onsi/ginkgo/v2/internal/interrupt_handler
@@ -114,6 +130,10 @@ golang.org/x/text/internal/utf8internal
 golang.org/x/text/language
 golang.org/x/text/runes
 golang.org/x/text/transform
+# golang.org/x/tools v0.1.10
+## explicit; go 1.17
+golang.org/x/tools/go/ast/inspector
+golang.org/x/tools/internal/typeparams
 # google.golang.org/appengine v1.4.0
 ## explicit
 google.golang.org/appengine/internal
