@@ -110,8 +110,14 @@ var ConnectService = &cobra.Command{
 			return err
 		}
 
-		if err := app.DeployApp(); err != nil {
-			return err
+		if ConduitExistingApp {
+			if err := app.PrepareForExistingApp(); err != nil {
+				return err
+			}
+		} else {
+			if err := app.DeployApp(); err != nil {
+				return err
+			}
 		}
 
 		if err := app.SetupTunnels(); err != nil {
