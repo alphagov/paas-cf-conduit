@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -79,8 +78,7 @@ func main() {
 	cmd.PersistentFlags().BoolVarP(&ConduitReuse, "reuse", "r", false, "deprecated alias for --no-delete")
 	cmd.PersistentFlags().MarkDeprecated("reuse", "please use --no-delete instead")
 	cmd.PersistentFlags().MarkHidden("reuse")
-	cmd.PersistentFlags().StringVarP(&ConduitAppName, "app-name", "n", fmt.Sprintf("__conduit_%s__", GenerateRandomString(8)), "app name to use for tunnelling app (must not exist)")
-	cmd.PersistentFlags().MarkHidden("app-name")
+	cmd.PersistentFlags().StringVarP(&ConduitAppName, "app-name", "n", "", "app name to use for tunnelling app (must not exist unless --existing-app is used)")
 	cmd.PersistentFlags().Int64VarP(&ConduitLocalPort, "local-port", "p", 7080, "start selecting local ports from")
 	cmd.PersistentFlags().StringVar(&ApiEndpoint, "endpoint", "", "set API endpoint")
 	cmd.PersistentFlags().MarkHidden("endpoint")

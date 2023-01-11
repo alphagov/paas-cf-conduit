@@ -65,6 +65,14 @@ var ConnectService = &cobra.Command{
 			ConduitReuse = true
 		}
 
+		if ConduitAppName == "" {
+			if ConduitExistingApp {
+				return errors.New("must specify --app-name of existing app to reuse")
+			}
+
+			ConduitAppName = fmt.Sprintf("__conduit_%s__", GenerateRandomString(8))
+		}
+
 		// create status writer
 		status := util.NewStatus(os.Stderr, NonInteractive)
 		defer status.Done()
