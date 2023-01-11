@@ -76,7 +76,7 @@ func NewClient(api string, token string, insecure bool, cipherSuites []uint16, m
 
 type Client struct {
 	Verbose            bool
-	CFClient           *gocfclient.Client
+	CFClient           gocfclient.CloudFoundryClient
 	ApiEndpoint        string
 	InsecureSkipVerify bool
 	CipherSuites       []uint16
