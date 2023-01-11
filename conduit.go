@@ -59,6 +59,12 @@ var ConnectService = &cobra.Command{
 			runargs = []string{}
 		}
 
+		if ConduitNoDelete || ConduitReuse || ConduitExistingApp {
+			// propagate alias, force on if ConduitExistingApp
+			ConduitNoDelete = true
+			ConduitReuse = true
+		}
+
 		// create status writer
 		status := util.NewStatus(os.Stderr, NonInteractive)
 		defer status.Done()
@@ -91,7 +97,7 @@ var ConnectService = &cobra.Command{
 
 		app := conduit.NewApp(
 			cfClient, status,
-			ConduitLocalPort, ConduitOrg, ConduitSpace, ConduitAppName, !ConduitReuse,
+			ConduitLocalPort, ConduitOrg, ConduitSpace, ConduitAppName, !ConduitNoDelete,
 			serviceInstanceNames, runargs, bindParams, ApiInsecure, tlsCipherSuites, versionID,
 		)
 
