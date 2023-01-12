@@ -27,7 +27,7 @@ func (ae AppExecution) Error() string {
 }
 
 type App struct {
-	cfClient             *client.Client
+	cfClient             client.Client
 	status               *util.Status
 	nextPort             int64
 	orgName              string
@@ -62,7 +62,7 @@ type ServiceProvider interface {
 }
 
 func NewApp(
-	cfClient *client.Client,
+	cfClient client.Client,
 	status *util.Status,
 	localPort int64,
 	orgName string,
@@ -222,16 +222,8 @@ func (a *App) destroyApp() error {
 		logging.Debug("failed to delete app", a.appName, "err:", err)
 
 		logging.Debug("refreshing auth token")
-		newToken, err := a.cfClient.GetNewAccessToken()
-		if err != nil {
-			logging.Debug("failed to get new access token, err:", err)
-			return fmt.Errorf("failed to delete %s app, please delete it manually\n", a.appName)
-		}
-		a.cfClient, err = client.NewClient(
-			a.cfClient.ApiEndpoint, newToken, a.cfClient.InsecureSkipVerify, a.cfClient.CipherSuites, a.cfClient.MinTLSVersion,
-		)
-		if err != nil {
-			logging.Debug("failed to create cf client with new access token, err:", err)
+		if err := a.cfClient.RefreshAccessToken(); err != nil {
+			logging.Debug("failed to refresh access token, err:", err)
 			return fmt.Errorf("failed to delete %s app, please delete it manually\n", a.appName)
 		}
 
@@ -455,8 +447,8 @@ func (a *App) SetupTunnels() error {
 func (a *App) startSSHTunnels() error {
 	a.tunnel = &ssh.Tunnel{
 		AppGuid:       a.appGUID,
-		TunnelAddr:    a.cfClient.Info.AppSSHEndpoint,
-		TunnelHostKey: a.cfClient.Info.AppSSHHostKeyFingerprint,
+		TunnelAddr:    a.cfClient.AppSSHEndpoint(),
+		TunnelHostKey: a.cfClient.AppSSHHostKeyFingerprint(),
 		ForwardAddrs:  a.forwardAddrs,
 		PasswordFunc:  a.cfClient.SSHCode,
 	}
