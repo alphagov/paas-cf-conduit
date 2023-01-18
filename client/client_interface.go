@@ -15,7 +15,7 @@ type Client interface {
 	GetAppByName(orgGuid, spaceGuid, appName string) (*gocfclient.App, error)
 	GetServiceBindings(filters ...string) (map[string]*gocfclient.ServiceBinding, error)
 	GetServiceInstances(filters ...string) (map[string]*gocfclient.ServiceInstance, error)
-	BindService(appGuid string, serviceInstanceGuid string, parameters map[string]interface{}) (Credentials, error)
+	BindService(appGuid string, serviceInstanceGuid string, parameters map[string]interface{}) (*Credentials, error)
 	UploadStaticAppBits(appGuid string) error
 	DestroyApp(appGuid string) error
 	CreateApp(name string, spaceGUID string) (guid string, err error)

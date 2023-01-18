@@ -30,8 +30,8 @@ type SystemEnv struct {
 }
 
 type VcapService struct {
-	Name         string
-	Credentials  credentials
+	Name         string `json:"name"`
+	Credentials  Credentials `json:"credentials"`
 	InstanceName string `json:"instance_name"`
 }
 
@@ -189,10 +189,10 @@ func (c *client) BindService(
 	appGuid string,
 	serviceInstanceGuid string,
 	parameters map[string]interface{},
-) (Credentials, error) {
+) (*Credentials, error) {
 	res := struct {
 		Entity struct {
-			Credentials credentials `json:"credentials"`
+			Credentials Credentials `json:"credentials"`
 		} `json:"entity"`
 	}{}
 
@@ -222,7 +222,7 @@ func (c *client) BindService(
 		return nil, err
 	}
 
-	return res.Entity.Credentials, nil
+	return &res.Entity.Credentials, nil
 
 }
 

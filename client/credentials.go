@@ -8,24 +8,12 @@ import (
 	"strings"
 )
 
-type Credentials interface {
-	Host() string
-	Port() int64
-	Username() string
-	Password() string
-	Database() string
-	URI() string
-	JDBCURI() string
-	SetAddress(host string, port int64)
-	IsTLSEnabled() bool
-}
-
-type credentials map[string]interface{}
+type Credentials map[string]interface{}
 
 // Get returns with the first existing key's value (case-insensitive comparison)
-func (c credentials) get(keys ...string) string {
+func (c *Credentials) get(keys ...string) string {
 	for _, key := range keys {
-		for k, v := range c {
+		for k, v := range *c {
 			if strings.EqualFold(k, key) {
 				return fmt.Sprintf("%v", v)
 			}
@@ -34,36 +22,36 @@ func (c credentials) get(keys ...string) string {
 	return ""
 }
 
-func (c credentials) Host() string {
+func (c *Credentials) Host() string {
 	return c.get("host", "hostname")
 }
 
-func (c credentials) Port() int64 {
-	port, _ := strconv.Atoi(fmt.Sprintf("%v", c["port"]))
+func (c *Credentials) Port() int64 {
+	port, _ := strconv.Atoi(fmt.Sprintf("%v", (*c)["port"]))
 	return int64(port)
 }
 
-func (c credentials) URI() string {
+func (c *Credentials) URI() string {
 	return c.get("uri", "url")
 }
 
-func (c credentials) JDBCURI() string {
+func (c *Credentials) JDBCURI() string {
 	return c.get("jdbcuri", "jdbcurl", "jdbc_uri", "jdbc_url")
 }
 
-func (c credentials) Username() string {
+func (c *Credentials) Username() string {
 	return c.get("user", "username")
 }
 
-func (c credentials) Password() string {
+func (c *Credentials) Password() string {
 	return c.get("password", "passwd", "pwd")
 }
 
-func (c credentials) Database() string {
+func (c *Credentials) Database() string {
 	return c.get("database", "db", "name")
 }
 
-func (c credentials) IsTLSEnabled() bool {
+func (c *Credentials) IsTLSEnabled() bool {
 	tlsEnabled, _ := strconv.ParseBool(c.get("tls", "tls_enabled", "tlsenabled"))
 	if tlsEnabled {
 		return true
@@ -79,30 +67,30 @@ func (c credentials) IsTLSEnabled() bool {
 	return false
 }
 
-func (c credentials) SetAddress(host string, port int64) {
+func (c *Credentials) SetAddress(host string, port int64) {
 	oldAddr := fmt.Sprintf("%s:%d", c.Host(), c.Port())
 	newAddr := fmt.Sprintf("%s:%d", host, port)
-	for k := range c {
-		if stringVal, ok := c[k].(string); ok {
-			c[k] = strings.Replace(stringVal, oldAddr, newAddr, -1)
+	for k := range *c {
+		if stringVal, ok := (*c)[k].(string); ok {
+			(*c)[k] = strings.Replace(stringVal, oldAddr, newAddr, -1)
 		}
 	}
 
-	for k := range c {
+	for k := range *c {
 		if strings.EqualFold(k, "host") || strings.EqualFold(k, "hostname") {
-			c[k] = host
+			(*c)[k] = host
 		}
 	}
-	c["port"] = port
+	(*c)["port"] = fmt.Sprintf("%d", port)
 }
 
-func (c credentials) Fprint(writer io.Writer, indent string) {
+func (c *Credentials) Fprint(writer io.Writer, indent string) {
 	var keys []string
-	for k := range c {
+	for k := range *c {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		fmt.Fprintf(writer, "%s%s: %v\n", indent, k, c[k])
+		fmt.Fprintf(writer, "%s%s: %v\n", indent, k, (*c)[k])
 	}
 }
