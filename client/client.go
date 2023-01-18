@@ -1,6 +1,7 @@
 package client
 
 //go:generate go run github.com/vburenin/ifacemaker -p client -s client -f client.go -i Client -o client_interface.go
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 . Client
 
 import (
 	"archive/zip"
