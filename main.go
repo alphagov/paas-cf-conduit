@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -27,6 +28,8 @@ var (
 	ApiToken          string
 	ApiInsecure       bool
 	RawBindParameters string
+	CipherSuites      []string
+	MinTLSVersion     string
 	shutdown          chan struct{}
 )
 
@@ -81,7 +84,21 @@ func main() {
 	cmd.PersistentFlags().BoolVar(&ApiInsecure, "insecure", false, "allow insecure API endpoint")
 	cmd.PersistentFlags().MarkHidden("insecure")
 	cmd.PersistentFlags().StringVarP(&RawBindParameters, "bind-parameters", "c", "{}", "bind parameters in JSON format")
+	cmd.PersistentFlags().StringSliceVar(&CipherSuites, "cipher-suites", []string{}, "list of cipher suites to use")
+	cmd.PersistentFlags().StringVar(&MinTLSVersion, "minimum-tls-version", "", "set minimum TLS version (e.g. TLS13)")
 	cmd.AddCommand(ConnectService)
 	cmd.AddCommand(Uninstall)
+
+	if len(CipherSuites) == 0 && os.Getenv("CF_CONDUIT_CIPHERSUITES") != "" {
+		CipherSuites = strings.Split(os.Getenv("CF_CONDUIT_CIPHERSUITES"), ",")
+	}
+
+	if MinTLSVersion == "" {
+		MinTLSVersion = "TLS12"
+		if os.Getenv("CF_CONDUIT_MIN_TLS_VERSION") != "" {
+			MinTLSVersion = os.Getenv("CF_CONDUIT_MIN_TLS_VERSION")
+		}
+	}
+
 	plugin.Start(&Plugin{cmd})
 }

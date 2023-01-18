@@ -32,12 +32,28 @@ type VcapService struct {
 	Credentials credentials
 }
 
-func NewClient(api string, token string, insecure bool) (*Client, error) {
+func NewClient(api string, token string, insecure bool, cipherSuites []uint16, minTLSVersion uint16) (*Client, error) {
+
+	// Use the TLS config when creating an HTTP client
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: insecure,
+				MinVersion:         minTLSVersion,
+				CipherSuites:       cipherSuites,
+			},
+		},
+	}
+
 	clientConfig := &gocfclient.Config{
 		ApiAddress: api,
 		Token:      strings.TrimPrefix(token, "bearer "),
+		HttpClient: client,
 	}
-	cf, _ := gocfclient.NewClient(clientConfig)
+	cf, err := gocfclient.NewClient(clientConfig)
+	if err != nil {
+		return nil, err
+	}
 
 	info, err := cf.GetInfo()
 	if err != nil {
@@ -48,6 +64,8 @@ func NewClient(api string, token string, insecure bool) (*Client, error) {
 		CFClient:           cf,
 		ApiEndpoint:        api,
 		InsecureSkipVerify: insecure,
+		CipherSuites:       cipherSuites,
+		MinTLSVersion:      minTLSVersion,
 		Info:               info,
 		Token:              token,
 	}
@@ -60,6 +78,8 @@ type Client struct {
 	CFClient           *gocfclient.Client
 	ApiEndpoint        string
 	InsecureSkipVerify bool
+	CipherSuites       []uint16
+	MinTLSVersion      uint16
 	Token              string
 	Info               *gocfclient.Info
 }
@@ -263,6 +283,8 @@ func (c *Client) SSHCode() (string, error) {
 			DisableKeepAlives: true,
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: c.InsecureSkipVerify,
+				CipherSuites:       c.CipherSuites,
+				MinVersion:         c.MinTLSVersion,
 			},
 			Proxy:               http.ProxyFromEnvironment,
 			TLSHandshakeTimeout: 10 * time.Second,

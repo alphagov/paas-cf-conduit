@@ -46,6 +46,9 @@ type App struct {
 	forwardAddrs         []ssh.ForwardAddrs
 	tunnel               *ssh.Tunnel
 	tlsTunnels           []*tls.Tunnel
+	tlsInsecure          bool
+	tlsCipherSuites      []uint16
+	tlsMinVersion        uint16
 }
 
 type ServiceProvider interface {
@@ -68,6 +71,9 @@ func NewApp(
 	serviceInstanceNames []string,
 	runArgs []string,
 	bindParameters map[string]interface{},
+	tlsInsecure bool,
+	tlsCipherSuites []uint16,
+	tlsMinVersion uint16,
 ) *App {
 	var program string
 	if len(runArgs) > 0 {
@@ -88,6 +94,9 @@ func NewApp(
 		runEnv:               make(map[string]string),
 		forwardAddrs:         make([]ssh.ForwardAddrs, 0),
 		bindParameters:       bindParameters,
+		tlsInsecure:          tlsInsecure,
+		tlsCipherSuites:      tlsCipherSuites,
+		tlsMinVersion:        tlsMinVersion,
 	}
 }
 
@@ -172,7 +181,7 @@ func (a *App) destroyApp() error {
 			return fmt.Errorf("failed to delete %s app, please delete it manually\n", a.appName)
 		}
 		a.cfClient, err = client.NewClient(
-			a.cfClient.ApiEndpoint, newToken, a.cfClient.InsecureSkipVerify,
+			a.cfClient.ApiEndpoint, newToken, a.cfClient.InsecureSkipVerify, a.cfClient.CipherSuites, a.cfClient.MinTLSVersion,
 		)
 		if err != nil {
 			logging.Debug("failed to create cf client with new access token, err:", err)
@@ -367,7 +376,7 @@ func (a *App) startTLSTunnels() error {
 			continue
 		}
 
-		tlsTunnel := tls.NewTunnel(addr.TLSTunnelAddress(), addr.LocalAddress())
+		tlsTunnel := tls.NewTunnel(addr.TLSTunnelAddress(), addr.LocalAddress(), addr.RemoteAddr, a.tlsInsecure, a.tlsCipherSuites, a.tlsMinVersion)
 		_, err := tlsTunnel.Start()
 		if err != nil {
 			return err

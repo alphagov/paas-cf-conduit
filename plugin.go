@@ -57,7 +57,6 @@ func (p *Plugin) Run(conn plugin.CliConnection, args []string) {
 			exitCode = exitError.ExitCode
 		}
 
-		fmt.Println(err)
 		os.Exit(exitCode)
 	}
 
@@ -70,7 +69,7 @@ func (p *Plugin) GetMetadata() plugin.PluginMetadata {
 		Version: plugin.VersionType{
 			Major: 0,
 			Minor: 0,
-			Build: 14,
+			Build: 15,
 		},
 		MinCliVersion: plugin.VersionType{
 			Major: 6,
