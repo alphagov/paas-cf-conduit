@@ -66,6 +66,13 @@ cf conduit service-1 service-2
 
 Output from the command will report connection details for the tunnel(s) in the foreground, hit Ctrl+C to terminate the connections.
 
+### Conduit apps
+
+Traditionally `cf-conduit` creates an app to implement the tunnel. This app can be named with the `--app-name` option. The app `cf-conduit` created, will be deleted when the tunnel is closed. `--no-delete` option stops `cf-conduit` from deleting the app when the tunnel closes.
+
+### Reusing existing app
+
+An existing app can be reused, providing `--existing-app` flag with `--app-name`. `cf-conduit` will not delete an existing app while using this option. The existing app needs to be bound to the services we want cf-conduit to tunnel.
 
 ### Running database tools
 
