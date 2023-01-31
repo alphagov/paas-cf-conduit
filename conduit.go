@@ -59,6 +59,20 @@ var ConnectService = &cobra.Command{
 			runargs = []string{}
 		}
 
+		if ConduitNoDelete || ConduitReuse || ConduitExistingApp {
+			// propagate alias, force on if ConduitExistingApp
+			ConduitNoDelete = true
+			ConduitReuse = true
+		}
+
+		if ConduitAppName == "" {
+			if ConduitExistingApp {
+				return errors.New("must specify --app-name of existing app to reuse")
+			}
+
+			ConduitAppName = fmt.Sprintf("__conduit_%s__", GenerateRandomString(8))
+		}
+
 		// create status writer
 		status := util.NewStatus(os.Stderr, NonInteractive)
 		defer status.Done()
@@ -91,7 +105,7 @@ var ConnectService = &cobra.Command{
 
 		app := conduit.NewApp(
 			cfClient, status,
-			ConduitLocalPort, ConduitOrg, ConduitSpace, ConduitAppName, !ConduitReuse,
+			ConduitLocalPort, ConduitOrg, ConduitSpace, ConduitAppName, !ConduitNoDelete,
 			serviceInstanceNames, runargs, bindParams, ApiInsecure, tlsCipherSuites, versionID,
 		)
 
@@ -110,8 +124,14 @@ var ConnectService = &cobra.Command{
 			return err
 		}
 
-		if err := app.DeployApp(); err != nil {
-			return err
+		if ConduitExistingApp {
+			if err := app.PrepareForExistingApp(); err != nil {
+				return err
+			}
+		} else {
+			if err := app.DeployApp(); err != nil {
+				return err
+			}
 		}
 
 		if err := app.SetupTunnels(); err != nil {

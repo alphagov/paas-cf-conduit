@@ -1,5 +1,8 @@
 package client
 
+//go:generate go run github.com/vburenin/ifacemaker -p client -s client -f client.go -i Client -o client_interface.go
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 . Client
+
 import (
 	"archive/zip"
 	"bytes"
@@ -28,74 +31,85 @@ type SystemEnv struct {
 }
 
 type VcapService struct {
-	Name        string
-	Credentials credentials
+	Name         string `json:"name"`
+	Credentials  Credentials `json:"credentials"`
+	InstanceName string `json:"instance_name"`
 }
 
-func NewClient(api string, token string, insecure bool, cipherSuites []uint16, minTLSVersion uint16) (*Client, error) {
-
-	// Use the TLS config when creating an HTTP client
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: insecure,
-				MinVersion:         minTLSVersion,
-				CipherSuites:       cipherSuites,
-			},
-		},
+func NewClient(api string, token string, insecure bool, cipherSuites []uint16, minTLSVersion uint16) (Client, error) {
+	c := &client{
+		apiEndpoint:        api,
+		insecureSkipVerify: insecure,
+		token:              token,
+		cipherSuites:       cipherSuites,
+		minTLSVersion:      minTLSVersion,
 	}
-
-	clientConfig := &gocfclient.Config{
-		ApiAddress: api,
-		Token:      strings.TrimPrefix(token, "bearer "),
-		HttpClient: client,
-	}
-	cf, err := gocfclient.NewClient(clientConfig)
+	err := c.init()
 	if err != nil {
 		return nil, err
-	}
-
-	info, err := cf.GetInfo()
-	if err != nil {
-		return nil, err
-	}
-
-	c := &Client{
-		CFClient:           cf,
-		ApiEndpoint:        api,
-		InsecureSkipVerify: insecure,
-		CipherSuites:       cipherSuites,
-		MinTLSVersion:      minTLSVersion,
-		Info:               info,
-		Token:              token,
 	}
 
 	return c, nil
 }
 
-type Client struct {
-	Verbose            bool
-	CFClient           *gocfclient.Client
-	ApiEndpoint        string
-	InsecureSkipVerify bool
-	CipherSuites       []uint16
-	MinTLSVersion      uint16
-	Token              string
-	Info               *gocfclient.Info
+type client struct {
+	verbose            bool
+	goCFClient         gocfclient.CloudFoundryClient
+	apiEndpoint        string
+	insecureSkipVerify bool
+	cipherSuites       []uint16
+	minTLSVersion      uint16
+	token              string
+	info               *gocfclient.Info
 }
 
-func (c *Client) GetNewAccessToken() (string, error) {
+func (c *client) init() (error) {
+	// Use the TLS config when creating an HTTP client
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: c.insecureSkipVerify,
+				MinVersion:         c.minTLSVersion,
+				CipherSuites:       c.cipherSuites,
+			},
+		},
+	}
+
+	clientConfig := &gocfclient.Config{
+		ApiAddress: c.apiEndpoint,
+		Token:      strings.TrimPrefix(c.token, "bearer "),
+		HttpClient: client,
+	}
+	cf, err := gocfclient.NewClient(clientConfig)
+	if err != nil {
+		return err
+	}
+
+	info, err := cf.GetInfo()
+	if err != nil {
+		return err
+	}
+
+	c.goCFClient = cf
+	c.info = info
+	
+	return nil
+}
+
+func (c *client) RefreshAccessToken() (error) {
 	token, err := c.output("oauth-token")
 	if err != nil {
-		return "", err
+		return err
 	}
-	return strings.TrimSpace(strings.TrimPrefix(token, "bearer ")), nil
+	c.token = token
+
+	return c.init()
 }
 
-func (c *Client) GetAppEnv(appGuid string) (*Env, error) {
+func (c *client) GetAppEnv(appGuid string) (*Env, error) {
 	env := Env{}
-	req := c.CFClient.NewRequest("GET", "/v2/apps/"+appGuid+"/env")
-	resp, err := c.CFClient.DoRequest(req)
+	req := c.goCFClient.NewRequest("GET", "/v2/apps/"+appGuid+"/env")
+	resp, err := c.goCFClient.DoRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -108,8 +122,8 @@ func (c *Client) GetAppEnv(appGuid string) (*Env, error) {
 	return &env, nil
 }
 
-func (c *Client) GetSpaceByName(orgGuid string, name string) (*gocfclient.Space, error) {
-	space, err := c.CFClient.GetSpaceByName(name, orgGuid)
+func (c *client) GetSpaceByName(orgGuid string, name string) (*gocfclient.Space, error) {
+	space, err := c.goCFClient.GetSpaceByName(name, orgGuid)
 
 	if err != nil {
 		return nil, err
@@ -118,8 +132,8 @@ func (c *Client) GetSpaceByName(orgGuid string, name string) (*gocfclient.Space,
 	return &space, err
 }
 
-func (c *Client) GetOrgByName(name string) (*gocfclient.Org, error) {
-	org, err := c.CFClient.GetOrgByName(name)
+func (c *client) GetOrgByName(name string) (*gocfclient.Org, error) {
+	org, err := c.goCFClient.GetOrgByName(name)
 
 	if err != nil {
 		return nil, err
@@ -127,10 +141,37 @@ func (c *Client) GetOrgByName(name string) (*gocfclient.Org, error) {
 	return &org, nil
 }
 
-func (c *Client) GetServiceInstances(filters ...string) (map[string]*gocfclient.ServiceInstance, error) {
+func (c *client) GetAppByName(orgGuid, spaceGuid, appName string) (*gocfclient.App, error) {
+	app, err := c.goCFClient.AppByName(appName, spaceGuid, orgGuid)
+
+	if err != nil {
+		return nil, err
+	}
+	return &app, nil
+}
+
+func (c *client) GetServiceBindings(filters ...string) (map[string]*gocfclient.ServiceBinding, error) {
+	svcBindingMap := map[string]*gocfclient.ServiceBinding{}
+
+	bindings, err := c.goCFClient.ListServiceBindingsByQuery(url.Values{
+		"q": filters,
+	})
+
+	if err != nil {
+		return svcBindingMap, err
+	}
+
+	for i, binding := range bindings {
+		svcBindingMap[binding.ServiceInstanceGuid] = &bindings[i]
+	}
+
+	return svcBindingMap, nil
+}
+
+func (c *client) GetServiceInstances(filters ...string) (map[string]*gocfclient.ServiceInstance, error) {
 	svcInstanceMap := map[string]*gocfclient.ServiceInstance{}
 
-	instances, err := c.CFClient.ListServiceInstancesByQuery(url.Values{
+	instances, err := c.goCFClient.ListServiceInstancesByQuery(url.Values{
 		"q": filters,
 	})
 
@@ -145,14 +186,14 @@ func (c *Client) GetServiceInstances(filters ...string) (map[string]*gocfclient.
 	return svcInstanceMap, nil
 }
 
-func (c *Client) BindService(
+func (c *client) BindService(
 	appGuid string,
 	serviceInstanceGuid string,
 	parameters map[string]interface{},
-) (Credentials, error) {
+) (*Credentials, error) {
 	res := struct {
 		Entity struct {
-			Credentials credentials `json:"credentials"`
+			Credentials Credentials `json:"credentials"`
 		} `json:"entity"`
 	}{}
 
@@ -166,8 +207,8 @@ func (c *Client) BindService(
 		return nil, err
 	}
 
-	req := c.CFClient.NewRequestWithBody("POST", "/v2/service_bindings", bytes.NewReader(bodyJson))
-	resp, err := c.CFClient.DoRequest(req)
+	req := c.goCFClient.NewRequestWithBody("POST", "/v2/service_bindings", bytes.NewReader(bodyJson))
+	resp, err := c.goCFClient.DoRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -182,11 +223,11 @@ func (c *Client) BindService(
 		return nil, err
 	}
 
-	return res.Entity.Credentials, nil
+	return &res.Entity.Credentials, nil
 
 }
 
-func (c *Client) UploadStaticAppBits(appGuid string) error {
+func (c *client) UploadStaticAppBits(appGuid string) error {
 	buf := new(bytes.Buffer)
 	zipWriter := zip.NewWriter(buf)
 	err := createZeroByteFileInZip(zipWriter, "Staticfile")
@@ -194,16 +235,16 @@ func (c *Client) UploadStaticAppBits(appGuid string) error {
 		return err
 	}
 
-	return c.CFClient.UploadAppBits(buf, appGuid)
+	return c.goCFClient.UploadAppBits(buf, appGuid)
 }
 
-func (c *Client) DestroyApp(appGuid string) error {
-	req := c.CFClient.NewRequest("DELETE", "/v3/apps/"+appGuid)
-	_, err := c.CFClient.DoRequest(req)
+func (c *client) DestroyApp(appGuid string) error {
+	req := c.goCFClient.NewRequest("DELETE", "/v3/apps/"+appGuid)
+	_, err := c.goCFClient.DoRequest(req)
 	return err
 }
 
-func (c *Client) CreateApp(name string, spaceGUID string) (guid string, err error) {
+func (c *client) CreateApp(name string, spaceGUID string) (guid string, err error) {
 	req := gocfclient.AppCreateRequest{
 		Name:            name,
 		SpaceGuid:       spaceGUID,
@@ -216,7 +257,7 @@ func (c *Client) CreateApp(name string, spaceGUID string) (guid string, err erro
 		Diego:           true,
 	}
 
-	app, err := c.CFClient.CreateApp(req)
+	app, err := c.goCFClient.CreateApp(req)
 	if err != nil {
 		return "", err
 	}
@@ -224,14 +265,14 @@ func (c *Client) CreateApp(name string, spaceGUID string) (guid string, err erro
 	return app.Guid, nil
 }
 
-func (c *Client) StartApp(appGuid string) error {
-	return c.CFClient.StartApp(appGuid)
+func (c *client) StartApp(appGuid string) error {
+	return c.goCFClient.StartApp(appGuid)
 }
 
-func (c *Client) PollForAppState(appGuid string, state string, maxRetries int) error {
+func (c *client) PollForAppState(appGuid string, state string, maxRetries int) error {
 	tries := 0
 	for {
-		app, err := c.CFClient.GetAppByGuid(appGuid)
+		app, err := c.goCFClient.GetAppByGuid(appGuid)
 		if err != nil {
 			return err
 		}
@@ -246,7 +287,7 @@ func (c *Client) PollForAppState(appGuid string, state string, maxRetries int) e
 	}
 }
 
-func (c *Client) output(args ...string) (string, error) {
+func (c *client) output(args ...string) (string, error) {
 	cmd, err := c.newCommand(args...)
 	if err != nil {
 		return "", err
@@ -258,7 +299,7 @@ func (c *Client) output(args ...string) (string, error) {
 	return string(b), nil
 }
 
-func (c *Client) newCommand(args ...string) (*exec.Cmd, error) {
+func (c *client) newCommand(args ...string) (*exec.Cmd, error) {
 	exe, err := exec.LookPath("cf")
 	if err != nil {
 		return nil, errors.New("cannot find 'cf' command in PATH")
@@ -271,7 +312,15 @@ func (c *Client) newCommand(args ...string) (*exec.Cmd, error) {
 	return cmd, nil
 }
 
-func (c *Client) SSHCode() (string, error) {
+func (c *client) AppSSHEndpoint() (string) {
+	return c.info.AppSSHEndpoint
+}
+
+func (c *client) AppSSHHostKeyFingerprint() (string) {
+	return c.info.AppSSHHostKeyFingerprint
+}
+
+func (c *client) SSHCode() (string, error) {
 	// Uses its own http client as the token endpoint is on a different domain
 	errPreventRedirect := errors.New("prevent-redirect")
 	httpClient := &http.Client{
@@ -282,16 +331,16 @@ func (c *Client) SSHCode() (string, error) {
 		Transport: &http.Transport{
 			DisableKeepAlives: true,
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: c.InsecureSkipVerify,
-				CipherSuites:       c.CipherSuites,
-				MinVersion:         c.MinTLSVersion,
+				InsecureSkipVerify: c.insecureSkipVerify,
+				CipherSuites:       c.cipherSuites,
+				MinVersion:         c.minTLSVersion,
 			},
 			Proxy:               http.ProxyFromEnvironment,
 			TLSHandshakeTimeout: 10 * time.Second,
 		},
 	}
 
-	info, err := c.CFClient.GetInfo()
+	info, err := c.goCFClient.GetInfo()
 	if err != nil {
 		return "", err
 	}
@@ -314,7 +363,7 @@ func (c *Client) SSHCode() (string, error) {
 		return "", err
 	}
 
-	token, err := c.CFClient.GetToken()
+	token, err := c.goCFClient.GetToken()
 	if err != nil {
 		return "", err
 	}

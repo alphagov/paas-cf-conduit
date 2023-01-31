@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -18,19 +17,21 @@ import (
 )
 
 var (
-	NonInteractive    bool
-	ConduitReuse      bool
-	ConduitAppName    string
-	ConduitOrg        string
-	ConduitSpace      string
-	ConduitLocalPort  int64
-	ApiEndpoint       string
-	ApiToken          string
-	ApiInsecure       bool
-	RawBindParameters string
-	CipherSuites      []string
-	MinTLSVersion     string
-	shutdown          chan struct{}
+	NonInteractive     bool
+	ConduitNoDelete    bool
+	ConduitExistingApp bool
+	ConduitReuse       bool
+	ConduitAppName     string
+	ConduitOrg         string
+	ConduitSpace       string
+	ConduitLocalPort   int64
+	ApiEndpoint        string
+	ApiToken           string
+	ApiInsecure        bool
+	RawBindParameters  string
+	CipherSuites       []string
+	MinTLSVersion      string
+	shutdown           chan struct{}
 )
 
 func init() {
@@ -72,10 +73,12 @@ func main() {
 	cmd.PersistentFlags().BoolVarP(&NonInteractive, "no-interactive", "", NonInteractive, "disable progress indicator and status output")
 	cmd.PersistentFlags().StringVarP(&ConduitOrg, "org", "o", "", "target org (defaults to currently targeted org)")
 	cmd.PersistentFlags().StringVarP(&ConduitSpace, "space", "s", "", "target space (defaults to currently targeted space)")
-	cmd.PersistentFlags().BoolVarP(&ConduitReuse, "reuse", "r", false, "speed up multiple invocations of conduit by not destroying the tunnelling app")
+	cmd.PersistentFlags().BoolVarP(&ConduitExistingApp, "existing-app", "e", false, "use an existing app (named by --app-name) instead of creating one")
+	cmd.PersistentFlags().BoolVarP(&ConduitNoDelete, "no-delete", "k", false, "don't delete app on conduit shutdown (implied by --existing-app)")
+	cmd.PersistentFlags().BoolVarP(&ConduitReuse, "reuse", "r", false, "deprecated alias for --no-delete")
+	cmd.PersistentFlags().MarkDeprecated("reuse", "please use --no-delete instead")
 	cmd.PersistentFlags().MarkHidden("reuse")
-	cmd.PersistentFlags().StringVarP(&ConduitAppName, "app-name", "n", fmt.Sprintf("__conduit_%s__", GenerateRandomString(8)), "app name to use for tunnelling app (must not exist)")
-	cmd.PersistentFlags().MarkHidden("app-name")
+	cmd.PersistentFlags().StringVarP(&ConduitAppName, "app-name", "n", "", "app name to use for tunnelling app (must not exist unless --existing-app is used)")
 	cmd.PersistentFlags().Int64VarP(&ConduitLocalPort, "local-port", "p", 7080, "start selecting local ports from")
 	cmd.PersistentFlags().StringVar(&ApiEndpoint, "endpoint", "", "set API endpoint")
 	cmd.PersistentFlags().MarkHidden("endpoint")
