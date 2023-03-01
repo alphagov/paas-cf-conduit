@@ -68,8 +68,8 @@ func (p *Plugin) GetMetadata() plugin.PluginMetadata {
 		Name: "conduit",
 		Version: plugin.VersionType{
 			Major: 0,
-			Minor: 0,
-			Build: 15,
+			Minor: 1,
+			Build: 1,
 		},
 		MinCliVersion: plugin.VersionType{
 			Major: 6,
