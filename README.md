@@ -66,6 +66,12 @@ cf conduit service-1 service-2
 
 Output from the command will report connection details for the tunnel(s) in the foreground, hit Ctrl+C to terminate the connections.
 
+### Networking requirements - Egress
+
+Resources running Conduit will need to be able to route TCP traffic outbound freely on the following ports:
+* 443
+* 2222
+
 ### Conduit apps
 
 Traditionally `cf-conduit` creates an app to implement the tunnel. This app can be named with the `--app-name` option. The app `cf-conduit` created, will be deleted when the tunnel is closed. `--no-delete` option stops `cf-conduit` from deleting the app when the tunnel closes.
