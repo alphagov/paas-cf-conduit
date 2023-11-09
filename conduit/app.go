@@ -238,7 +238,7 @@ func (a *App) destroyApp() error {
 func (a *App) bindServices() error {
 	var err error
 	// get service instances
-	a.status.Text("Fetching service infomation")
+	a.status.Text("Fetching service information")
 	serviceInstances, err := a.cfClient.GetServiceInstances(
 		fmt.Sprintf("space_guid:%s", a.space.Guid),
 	)
