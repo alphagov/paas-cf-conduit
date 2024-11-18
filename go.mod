@@ -1,6 +1,6 @@
 module github.com/alphagov/paas-cf-conduit
 
-go 1.18
+go 1.23
 
 require (
 	code.cloudfoundry.org/cli v6.32.0+incompatible
